@@ -1,8 +1,8 @@
 # Church.IO OneBody
 
-[![Build Status](https://travis-ci.org/churchio/onebody.png)](https://travis-ci.org/churchio/onebody)
-[![Code Climate](https://codeclimate.com/github/churchio/onebody.png)](https://codeclimate.com/github/churchio/onebody)
-http://church.io
+[![Build Status](http://img.shields.io/travis/churchio/onebody.svg?style=flat)](https://travis-ci.org/churchio/onebody)
+[![Code Climate](http://img.shields.io/codeclimate/github/churchio/onebody.svg?style=flat)](https://codeclimate.com/github/churchio/onebody)
+[![Site](http://img.shields.io/badge/site-church.io-blue.svg?style=flat)](http://church.io)
 
 OneBody is open-source, web-based social networking, email list, online directory, and lightweight document management software for churches.
 
@@ -44,13 +44,14 @@ Operating System: Mac or Linux (See Vagrant above if you're on Windows)
 1. Install Ruby 2.1.2 or higher (we recommend you use [RVM](https://rvm.io/)).
 2. Install MySQL.
 3. Install Git.
-4. `git clone git://github.com/churchio/onebody.git && cd onebody`
-5. `mysql -u root -e "create database onebody_dev default character set utf8 default collate utf8_general_ci; grant all on onebody_dev.* to onebody@localhost identified by 'onebody';"`
-6. `cp config/database.yml{.example,}`
-7. `bundle install`
-8. `cp config/secrets.yml{.example,} && vim config/secrets.yml` and add a random secret token to both the "development" and "test" sections (you can use `rake secret` to generate a new random secret).
-9. `rake db:migrate`
-10. `rails server`
+4. Install ImageMagick.
+5. `git clone git://github.com/churchio/onebody.git && cd onebody`
+6. `mysql -u root -e "create database onebody_dev default character set utf8 default collate utf8_general_ci; grant all on onebody_dev.* to onebody@localhost identified by 'onebody';"`
+7. `cp config/database.yml{.example,}`
+8. `bundle install`
+9. `cp config/secrets.yml{.example,} && vim config/secrets.yml` and add a random secret token to both the "development" and "test" sections (you can use `rake secret` to generate a new random secret).
+10. `rake db:migrate`
+11. `rails server`
 
 Now visit the site running in development mode at http://localhost:3000.
 
@@ -59,15 +60,21 @@ Now visit the site running in development mode at http://localhost:3000.
 To run tests:
 
 ```
-mysql -u root -e "create database onebody_test default character set utf8 default collate utf8_general_ci; grant all on onebody_test.* to onebody@localhost identified by 'onebody';"
+RAILS_ENV=test rake db:migrate
 rspec
+```
+
+If you don't have a test database yet, create it like you did the dev database:
+
+```
+mysql -u root -e "create database onebody_test default character set utf8 default collate utf8_general_ci; grant all on onebody_test.* to onebody@localhost identified by 'onebody';"
 ```
 
 ## Get Help
 
 * IRC channel #church.io on Freenode (try the [web-based IRC client](https://webchat.freenode.net/?channels=#church.io))
 * [Wiki](http://wiki.github.com/churchio/onebody) - There is some (possibly outdated) information here. We'll work to clean this up shortly after releasing 3.0.
-* [Google Group](http://groups.google.com/group/churchio) - Community of people building open source church software. If you're stuck, ask nicely for some help and you will probably get it.
+* [Google Group](http://groups.google.com/group/churchio)
 
 ## Contributing
 

@@ -13,6 +13,7 @@ describe Email do
     it "sends an api request to mailgun" do
 
       expect(Email).to receive(:show_routes) {
+        # Yes the keys really are strings.
         {"total_count"=>0, "items"=>[]}
       }
 

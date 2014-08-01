@@ -8,14 +8,16 @@ class EmailsController < ApplicationController
     render nothing: true
   end
 
-  #TODO Should this method be here?
   def create_route
     result = Email.create_catch_all
-    render text: result, layout: true
-  end
-
-  def show_route
-     Email.show_routes(limit: 10) 
+    if result["message"] == "Route found."
+      flash[:notice] = t('application.mailgun_route_found')
+    elsif result["message"] == "Route has been created"
+      flash[:notice] = t('application.mailgun_route_created')
+    else
+      flash[:error] = t('application.mailgun_route_error')
+    end
+    redirect_to administration_settings_path(anchor: 'tab-advanced')
   end
 
   private

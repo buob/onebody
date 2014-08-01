@@ -22,7 +22,7 @@ class Email
     if match.empty?
       self.post("https://api:#{APIKEY}@api.mailgun.net/v2/routes", body: self.build_data)
     else
-      "Found #{match.length} match(es)- #{match}"
+      {"message"=>"Route found."}
     end
   end
 

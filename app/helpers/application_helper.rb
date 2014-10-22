@@ -43,8 +43,13 @@ module ApplicationHelper
     preserve_breaks(text, false)
   end
 
-  def simple_url(url)
-    url.sub(/^https?:\/\//, '').sub(/\/$/, '')
+  def simple_url(url, options={ www: true })
+    if options[:www]
+      regex = /^https?:\/\//
+    else
+      regex = /^https?:\/\/(www\.)?/
+    end
+    url.sub(regex, '').sub(/\/$/, '')
   end
 
   def me?
@@ -151,8 +156,16 @@ module ApplicationHelper
     controller.params_without_action
   end
 
+  def date_format
+    placeholder = Setting.get(:formats, :date)
+      .gsub(/%Y/, I18n.t('date_format.YYYY'))
+      .gsub(/%m/, I18n.t('date_format.MM'))
+      .gsub(/%d/, I18n.t('date_format.DD'))
+    placeholder unless placeholder.include?('%')
+  end
+
   def datepicker_format
-    Setting.get(:formats, :date) =~ %r{%d/%m} ? 'dd/mm/yyyy' : 'mm/dd/yyyy'
+    date_format.downcase
   end
 
   # TODO replace all inline JS links with unobtrusive JS
@@ -188,9 +201,14 @@ module ApplicationHelper
 
   def map_header(object)
     if object.mapable?
+      data = { latitude: object.latitude,
+               longitude: object.longitude,
+               address: preserve_breaks(object.pretty_address),
+               notice: t('maps.notice'),
+               protocol: Setting.get(:features, :ssl) ? 'https' : 'http' }
       content_for(:header) do
         raw(
-          content_tag(:div, '', id: 'map', data: { latitude: object.latitude, longitude: object.longitude, address: preserve_breaks(object.location), notice: t('maps.notice') }) +
+          content_tag(:div, '', id: 'map', data: data) +
           content_tag(:section, class: 'content-header map-overlay') do
             breadcrumbs +
             content_tag(:h1) do
@@ -199,6 +217,27 @@ module ApplicationHelper
             end
           end
         )
+      end
+    end
+  end
+
+  def analytics_js
+    if params[:controller] == 'administration/settings'
+      # workaround for Safari bug (see https://github.com/churchio/onebody/issues/262)
+      return
+    end
+    setting(:services, :analytics).to_s.html_safe if Rails.env.production?
+  end
+
+  # this is an ugly hack for Rails 4 because I18n.exception_handler isn't working with the t() helper
+  def t(*args)
+    if Rails.env.production?
+      super
+    else
+      super.tap do |result|
+        if result =~ /"(translation missing: .*)"/
+          raise $1
+        end
       end
     end
   end

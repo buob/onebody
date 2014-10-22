@@ -1,11 +1,10 @@
 class Family < ActiveRecord::Base
-
   include Authority::Abilities
   self.authorizer_name = 'FamilyAuthorizer'
 
   MAX_TO_BATCH_AT_A_TIME = 50
 
-  has_many :people, -> { order(:sequence) }, dependent: :destroy
+  has_many :people, -> { order(:position) }, dependent: :destroy
   has_many :updates, -> { order(:created_at) }
   accepts_nested_attributes_for :people
   belongs_to :site
@@ -18,7 +17,9 @@ class Family < ActiveRecord::Base
   scope :deleted, -> { where(deleted: true) }
   scope :has_printable_people, -> { where('(select count(*) from people where family_id = families.id and visible_on_printed_directory = ?) > 0', true) }
 
-  validates_presence_of :name, :last_name
+  validates :name, presence: true
+  validates :last_name, presence: true
+
   validates_uniqueness_of :barcode_id, allow_nil: true, scope: [:site_id, :deleted], unless: Proc.new { |f| f.deleted? }
   validates_uniqueness_of :alternate_barcode_id, allow_nil: true, scope: [:site_id, :deleted], unless: Proc.new { |f| f.deleted? }
   validates_length_of :barcode_id, :alternate_barcode_id, in: 5..50, allow_nil: true
@@ -40,6 +41,11 @@ class Family < ActiveRecord::Base
     end
   end
 
+  def initialize(*args)
+    super
+    self.country = Setting.get(:system, :default_country) unless country.present?
+  end
+
   geocoded_by :location
   after_validation :geocode
 
@@ -58,11 +64,19 @@ class Family < ActiveRecord::Base
   end
 
   def mapable?
-    latitude.to_i != 0.0 and longitude.to_i != 0.0
+    latitude.to_f != 0.0 and longitude.to_f != 0.0
   end
 
   def location
-    pretty_address if [address1, city, state].all?(&:present?)
+    if [address1, city, state].all?(&:present?)
+      {
+        street: address,
+        city: city,
+        state: state,
+        postalCode: zip,
+        adminArea1: country
+      }
+    end
   end
 
   # not HTML-escaped!
@@ -74,6 +88,7 @@ class Family < ActiveRecord::Base
       a << "\n#{city}, #{state}"
       a << "  #{zip}" if zip.present?
     end
+    return a
   end
 
   def short_zip
@@ -95,22 +110,8 @@ class Family < ActiveRecord::Base
     end
   end
 
-  def reorder_person(person, direction)
-    all = people.undeleted.to_a
-    index = all.index(person)
-    case direction
-    when 'up'
-      all.delete(person)
-      all.insert([index - 1, 0].max, person)
-    when 'down'
-      all.delete(person)
-      all.insert([index + 1, all.length].min, person)
-    end
-    all.each_with_index { |p, i| p.update_attribute(:sequence, i + 1) }
-  end
-
   def suggested_relationships
-    all_people = people.undeleted.order(:sequence)
+    all_people = people.undeleted.order(:position)
     relations = {
       adult: {
         male: {
@@ -177,9 +178,10 @@ class Family < ActiveRecord::Base
   end
 
   def anniversary_sharable_with(who)
-    people.undeleted.detect { |person|
-      person.anniversary and person.show_attribute_to?(:anniversary, who)
-    }.try(:anniversary)
+    dates = people.undeleted.adults.limit(2).map do |person|
+      person.anniversary if person.show_attribute_to?(:anniversary, who)
+    end
+    dates.first if dates.all? { |d| d == dates.first }
   end
 
   def suggested_name
@@ -236,9 +238,9 @@ class Family < ActiveRecord::Base
         record.each do |key, value|
           value = nil if value == ''
           # avoid overwriting a newer barcode
-          if key == 'barcode_id' and family.barcode_id_changed?
+          if key == 'barcode_id' and family[:barcode_id_changed]
             if value == family.barcode_id # barcode now matches (presumably, the external db has been updated to match the OneBody db)
-              family.barcode_id_changed = false # clear the flag
+              family[:barcode_id_changed] = false # clear the flag
             else
               next # don't overwrite the newer barcode with an older one
             end

@@ -14,13 +14,23 @@ module Concerns
     end
 
     def image?
-      image and %w(JPEG PNG GIF).include?(image[:format])
+      !!image
     end
+
+    def width
+      image[:width] if image?
+    end
+
+    def height
+      image[:height] if image?
+    end
+
+    private
 
     def mini_magick_image
       begin
         img = MiniMagick::Image.new(file.path)
-        img if img.valid?
+        img if img.valid? and %w(JPEG PNG GIF).include?(img[:format])
       rescue
         # html files cause MiniMagick to freak out without an Exception class :-(
         nil

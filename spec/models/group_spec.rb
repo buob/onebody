@@ -14,6 +14,7 @@ describe Group do
     context 'given user has a single class code' do
       before do
         @person = FactoryGirl.create(:person, classes: 'foo')
+        @group.membership_mode = 'link_code'
         @group.link_code = 'foo'
         @group.save
       end
@@ -26,6 +27,7 @@ describe Group do
     context 'given user has multiple class codes' do
       before do
         @person = FactoryGirl.create(:person, classes: 'foo,bar,baz')
+        @group.membership_mode = 'link_code'
         @group.link_code = 'bar'
         @group.save
       end
@@ -38,6 +40,7 @@ describe Group do
     context 'given user has multiple class codes with roles' do
       before do
         @person = FactoryGirl.create(:person, classes: 'foo[member],bar[participant|group leader],baz')
+        @group.membership_mode = 'link_code'
         @group.link_code = 'bar'
         @group.save
       end
@@ -72,6 +75,18 @@ describe Group do
         end
       end
     end
+
+    context 'group is set to auto_add "adults"' do
+      before do
+        @person2 = FactoryGirl.create(:person)
+        @child = FactoryGirl.create(:person, child: true)
+        @group.update_attribute(:membership_mode, 'adults')
+      end
+
+      it 'adds all people' do
+        expect(@group.people.reload).to include(@person, @person2)
+      end
+    end
   end
 
   context 'given one group set as parents_of for another' do
@@ -80,7 +95,7 @@ describe Group do
       @spouse = FactoryGirl.create(:person, family: @head.family)
       @child = FactoryGirl.create(:person, family: @head.family, child: true)
       @group.memberships.create!(person: @child)
-      @group2 = FactoryGirl.create(:group, parents_of: @group.id)
+      @group2 = FactoryGirl.create(:group, membership_mode: 'parents_of', parents_of: @group.id)
     end
 
     it 'should update its membership based on a parents_of selection' do
@@ -132,5 +147,11 @@ end.length).to eq(1)
   it "should be able to parse out the Google Calendar account info from an HTML link" do
     @group.update_attributes!(gcal_private_link: 'http://www.google.com/calendar/hosted/timmorgan.org/embed?src=4azsf34hrgq1t3lkjh4sdewzxc%40group.calendar.google.com&ctz=America/Chicago&pvttk=2a2453bc8ef65dddf11a4f43a133df12')
     expect(@group.gcal_account).to eq("4azsf34hrgq1t3lkjh4sdewzxc%40group.calendar.google.com")
+  end
+
+  describe 'share_token' do
+    it 'gets set on creation' do
+      expect(@group.share_token).to match(/^[0-9a-f]{50}$/)
+    end
   end
 end

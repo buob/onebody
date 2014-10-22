@@ -3,7 +3,18 @@ class Person < ActiveRecord::Base
   include Authority::Abilities
   self.authorizer_name = 'PersonAuthorizer'
 
+  include Concerns::Person::Child
+  include Concerns::Person::Password
+  include Concerns::Person::Friend
+  include Concerns::Person::Sharing
+  include Concerns::Person::Import
+  include Concerns::Person::Export
+  include Concerns::Person::PdfGen
+  include Concerns::DateWriter
+
   MAX_TO_BATCH_AT_A_TIME = 50
+
+  acts_as_list scope: :family
 
   cattr_accessor :logged_in # set in addition to @logged_in (for use by Notifier and other models)
 
@@ -15,7 +26,6 @@ class Person < ActiveRecord::Base
   has_many :albums, as: :owner
   has_many :pictures, -> { order(created_at: :desc) }
   has_many :messages
-  has_many :notes, -> { order(created_at: :desc) }
   has_many :updates, -> { order(:created_at) }
   has_many :prayer_signups
   has_and_belongs_to_many :verses
@@ -33,6 +43,7 @@ class Person < ActiveRecord::Base
   has_many :attendance_records
   has_many :stream_items
   has_many :generated_files
+  has_many :tasks
   has_one :stream_item, as: :streamable
   belongs_to :site
 
@@ -54,6 +65,8 @@ class Person < ActiveRecord::Base
   validates_presence_of :first_name, :last_name
   validates_length_of :password, minimum: 5, allow_nil: true, if: Proc.new { Person.logged_in }
   validates_length_of :description, maximum: 25
+  validates_length_of :twitter, maximum: 15, allow_nil: true, allow_blank: true
+  validates_format_of :twitter, with: /\A[a-z0-9_]+\z/i, allow_nil: true, allow_blank: true
   validates_confirmation_of :password, if: Proc.new { Person.logged_in }
   validates_uniqueness_of :alternate_email, allow_nil: true, scope: [:site_id, :deleted], unless: Proc.new { |p| p.deleted? }
   validates_uniqueness_of :feed_code, allow_nil: true, scope: :site_id
@@ -62,12 +75,20 @@ class Person < ActiveRecord::Base
   validates_format_of :business_email, allow_nil: true, allow_blank: true, with: VALID_EMAIL_ADDRESS
   validates_format_of :email, allow_nil: true, allow_blank: true, with: VALID_EMAIL_ADDRESS
   validates_format_of :alternate_email, allow_nil: true, allow_blank: true, with: VALID_EMAIL_ADDRESS
+  validates_format_of :facebook_url, allow_nil: true, allow_blank: true, with: /\Ahttps?\:\/\/www\.facebook\.com\/.+/
   validates_exclusion_of :business_category, in: ['!']
   validates_inclusion_of :gender, in: %w(Male Female), allow_nil: true
   validates_date_of :birthday, :anniversary, allow_nil: true
   validates_attachment_size :photo, less_than: PAPERCLIP_PHOTO_MAX_SIZE
   validates_attachment_content_type :photo, content_type: PAPERCLIP_PHOTO_CONTENT_TYPES
   validate :validate_email_unique
+
+  before_validation :clean_twitter_username
+
+  def clean_twitter_username
+    return unless twitter.present?
+    self.twitter = twitter[1..-1] if self.twitter.start_with?("@")
+  end
 
   def validate_email_unique
     return unless email.present? and not deleted?
@@ -88,6 +109,7 @@ class Person < ActiveRecord::Base
   after_create :create_as_stream_item
 
   def create_as_stream_item
+    return unless can_create_stream_item?
     StreamItem.create!(
       title: name,
       person_id: id,
@@ -96,6 +118,15 @@ class Person < ActiveRecord::Base
       created_at: created_at,
       shared: visible? && email.present?
     )
+  end
+
+  LIMIT_CONSECUTIVE_STREAM_ITEMS = 2
+
+  def can_create_stream_item?
+    previous = StreamItem.limit(LIMIT_CONSECUTIVE_STREAM_ITEMS)
+                         .order(id: :desc)
+                         .pluck(:streamable_type)
+    previous != ['Person'] * LIMIT_CONSECUTIVE_STREAM_ITEMS
   end
 
   after_update :update_stream_item
@@ -107,6 +138,18 @@ class Person < ActiveRecord::Base
     stream_item.save!
   end
 
+  def others_with_same_email
+    return [] unless family
+    family.people.undeleted.where(email: email).where.not(id: id)
+  end
+
+  after_save :clear_primary_emailer_on_others
+
+  def clear_primary_emailer_on_others
+    return unless family and primary_emailer?
+    family.people.undeleted.where(email: email).where.not(id: id).update_all(primary_emailer: false)
+  end
+
   def name
     @name ||= begin
       if deleted?
@@ -116,6 +159,13 @@ class Person < ActiveRecord::Base
       else
         "#{first_name} #{last_name}" rescue '???'
       end
+    end
+  end
+
+  def formatted_email
+    return unless email.present?
+    Mail::Address.new(email).tap do |address|
+      address.display_name = name
     end
   end
 
@@ -138,8 +188,8 @@ class Person < ActiveRecord::Base
     birthday and ((birthday.yday()+365 - today.yday()).modulo(365) < BIRTHDAY_SOON_DAYS)
   end
 
-  fall_through_attributes :home_phone, :address, :address1, :address2, :city, :state, :zip, :short_zip, :mapable?, to: :family
-  sharable_attributes     :home_phone, :mobile_phone, :work_phone, :fax, :email, :birthday, :address, :anniversary, :activity
+  delegate             :home_phone, :address, :address1, :address2, :city, :state, :zip, :short_zip, :mapable?, to: :family, allow_nil: true
+  sharable_attributes  :home_phone, :mobile_phone, :work_phone, :fax, :email, :birthday, :address, :anniversary, :activity
 
   self.skip_time_zone_conversion_for_attributes = [:birthday, :anniversary]
   self.digits_only_for_attributes = [:mobile_phone, :work_phone, :fax, :business_phone]
@@ -161,24 +211,10 @@ class Person < ActiveRecord::Base
   alias_method :can_edit?, :can_update?
 
   def member_of?(group)
-    memberships.where(group_id: group.id).first
+    memberships.where(group_id: group.id).any?
   end
 
-  def birthday=(d)
-    if d.is_a?(String) and d.length > 0 and date = Date.parse_in_locale(d).try(:rfc3339)
-      self[:birthday] = date
-    else
-      self[:birthday] = d
-    end
-  end
-
-  def anniversary=(d)
-    if d.is_a?(String) and d.length > 0 and date = Date.parse_in_locale(d).try(:rfc3339)
-      self[:anniversary] = date
-    else
-      self[:anniversary] = d
-    end
-  end
+  date_writer :birthday, :anniversary
 
   def parental_consent?; parental_consent.present?; end
   def adult_or_consent?; adult? or parental_consent?; end
@@ -219,10 +255,12 @@ class Person < ActiveRecord::Base
     write_attribute(:gender, g)
   end
 
-  # get the parents/guardians by grabbing people in family sequence 1 and 2 and adult?
+  # get the parents/guardians by grabbing people in family position 1 and 2 and adult?
   def parents
     if family
-      family.people.select { |p| !p.deleted? and p.adult? and [1, 2].include?(p.sequence) }
+      family.people.reorder(:id).select do |person|
+        !person.deleted? and person.adult? and [1, 2].include?(person.position)
+      end
     end
   end
 
@@ -251,18 +289,6 @@ class Person < ActiveRecord::Base
 
   def generate_api_key
     write_attribute :api_key, SecureRandom.hex(50)[0...50]
-  end
-
-  attr_writer :no_auto_sequence
-
-  before_save :update_sequence
-  def update_sequence
-    return if @no_auto_sequence
-    if family and sequence.nil?
-      scope = family.people.undeleted
-      scope = scope.where('id != ?', id) unless new_record?
-      self.sequence = scope.maximum(:sequence).to_i + 1
-    end
   end
 
   def can_edit_profile?
@@ -423,13 +449,4 @@ class Person < ActiveRecord::Base
     end
 
   end
-
-  # FIXME why does these have to be at the bottom?
-  include Concerns::Person::Child
-  include Concerns::Person::Password
-  include Concerns::Person::Friend
-  include Concerns::Person::Sharing
-  include Concerns::Person::Import
-  include Concerns::Person::Export
-  include Concerns::Person::PdfGen
 end

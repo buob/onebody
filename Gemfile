@@ -2,7 +2,7 @@ source 'http://rubygems.org'
 
 ruby File.read(File.expand_path('../.ruby-version', __FILE__)).strip.sub(/ruby\-/, '')
 
-gem 'rails', '~> 4.1.4'
+gem 'rails', '~> 4.1.5'
 gem 'rails_autolink'
 gem 'mysql2'
 gem 'jquery-rails'
@@ -17,9 +17,11 @@ gem 'rubyzip'
 gem 'zip-zip'
 gem 'sanitize'
 gem 'haml'
+gem 'httparty'
 gem 'draper'
 gem 'paperclip'
 gem 'acts_as_taggable_on_steroids', github: 'seven1m/acts_as_taggable_on_steroids'
+gem 'acts_as_list'
 gem 'pdf-writer', github: 'Hermanverschooten/pdf-writer', require: 'pdf/writer'
 gem 'authority'
 gem 'load_and_authorize_resource', github: 'seven1m/load_and_authorize_resource'
@@ -35,6 +37,8 @@ gem 'font-awesome-rails', github: 'bokmann/font-awesome-rails'
 gem 'truncate_html'
 gem 'geocoder'
 gem 'date_validator'
+gem 'country_select', github: 'stefanpenner/country_select'
+gem 'dossier'
 
 group :test do
   gem 'factory_girl_rails'
@@ -42,6 +46,8 @@ group :test do
 end
 
 group :development do
+  gem 'better_errors'
+  gem 'binding_of_caller'
   gem 'zeus'
   gem 'watchr'
   gem 'terminal-notifier'

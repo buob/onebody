@@ -1,0 +1,50 @@
+= render 'heading'
+
+= form_for @import do |form|
+  = hidden_field_tag :status, 'matched'
+
+  .form-group
+    = form.label :match_strategy, t('.form.match_strategy')
+    = form.select :match_strategy, import_match_strategies, {}, class: 'form-control'
+
+  .form-group
+    = form.check_box :create_as_active
+    = form.label :create_as_active, t('.form.create_as_active')
+
+  .form-group
+    = form.check_box :overwrite_changed_emails
+    = form.label :overwrite_changed_emails, t('.form.overwrite_changed_emails_html', url: administration_emails_path)
+
+  .form-group
+
+  %table.table
+    %thead
+      %tr
+        %th= t('.table.column')
+        %th= t('.table.attribute')
+        %th= t('.table.example')
+    %tbody
+      - @import.mappings.each do |from, to|
+        %tr.row-with-controls
+          %td
+            = from
+          %td
+            = select_tag "import[mappings][#{from}]", |
+              import_mapping_option_tags(from, to), |
+              include_blank: true, |
+              class: 'form-control'
+          %td
+            = @example[from]
+
+  .page-controls
+    = button_tag id: 'btn-preview', class: 'btn btn-success' do
+      = t('.save.button')
+      = icon 'fa fa-arrow-right'
+    = button_tag id: 'btn-execute', class: 'btn btn-danger', data: { method: 'patch', confirm: t('are_you_sure') }, style: 'display:none' do
+      = icon 'fa fa-bolt'
+      = t('administration.imports.show.execute.button')
+    = check_box_tag :dont_preview
+    = label_tag :dont_preview, t('.form.dont_preview')
+    = link_to @import, data: { method: :delete, confirm: t('are_you_sure') }, class: 'btn btn-delete pull-right' do
+      = icon 'fa fa-trash-o'
+      = t('.delete.button')

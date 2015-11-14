@@ -1,0 +1,45 @@
+td.icon-inset {
+  padding-left: 24px !important;
+}
+
+tr.expanding {
+  .folder-icon {
+    @extend .fa;
+    @extend .fa-folder-o;
+  }
+  &.expanded .folder-icon {
+    @extend .fa-folder-open-o;
+  }
+}
+
+td.icon, th.icon {
+  width: 32px;
+}
+
+table.table {
+  tr.description td, tr.details td {
+    border-top: none;
+    padding-top: 0;
+  }
+  td.actions {
+    white-space: nowrap;
+  }
+}
+
+.spaced-table td, .spaced-table th {
+  padding-right: 10px;
+}
+
+td.strong {
+  font-weight: bold;
+}
+
+tr.row-with-actions, tr.row-with-controls {
+  @extend tr.row-with-avatar;
+}
+
+.table-no-top-border tr:first-child {
+  th, td {
+    border-top: none;
+  }
+}

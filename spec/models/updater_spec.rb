@@ -1,4 +1,4 @@
-require_relative '../spec_helper'
+require_relative '../rails_helper'
 
 describe Updater do
 
@@ -67,7 +67,7 @@ describe Updater do
         @actual = Updater.new(params).params
       end
 
-      it 'should should be nil' do
+      it 'should be nil' do
         expected = {
           'person' => {'mobile_phone' => nil}
         }

@@ -1,0 +1,41 @@
+.form-group
+  = form.label :status
+  = form.select :status, t('people.edit.statuses').invert, {}, class: 'form-control'
+- if @person.adult_or_consent?
+  .callout.callout-info.status-help#status-inactive{ style: 'display:none' }
+    = t('people.edit.status_help.inactive')
+  .callout.callout-info.status-help#status-pending{ style: 'display:none' }
+    = t('people.edit.status_help.pending')
+  .callout.callout-info.status-help#status-active{ style: 'display:none' }
+    = t('people.edit.status_help.active')
+- else
+  .callout.callout-warning
+    = t('people.edit.status_help.not_an_adult')
+
+- if Setting.get(:features, :checkin)
+  .box.box-info
+    .box-header
+      %h3.box-title= t('people.checkin.heading')
+    .box-body
+      %p= t('people.checkin.intro')
+      .form-group
+        = form.label :can_pick_up
+        = form.text_field :can_pick_up, class: 'form-control'
+      .form-group
+        = form.label :cannot_pick_up
+        = form.text_field :cannot_pick_up, class: 'form-control'
+      .form-group
+        = form.label :medical_notes
+        = form.text_field :medical_notes, class: 'form-control'
+
+- if Setting.get(:features, :edit_legacy_ids)
+  .box.box-info
+    .box-header
+      %h3.box-title= t('people.advanced')
+    .box-body
+      .form-group
+        = form.label :legacy_id,        t('people.legacy_external_id')
+        = form.text_field :legacy_id, size: 6, class: 'form-control'
+      .form-group
+        = form.label :legacy_family_id, t('people.family_legacy_external_id')
+        = form.text_field :legacy_family_id, size: 6, class: 'form-control'

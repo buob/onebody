@@ -2,7 +2,7 @@
 
 .panel
   .panel-body
-    - if @logged_in.can_edit?(@news_item)
+    - if @logged_in.can_update?(@news_item)
       .pull-right
         = link_to edit_news_item_path(@news_item), class: 'btn btn-xs btn-info' do
           = icon 'fa fa-pencil'
@@ -13,3 +13,6 @@
     = render partial: 'news_item_meta', object: @news_item, as: :news_item
 
 .news-item= sanitize_html @news_item.body
+
+%h3= t('Comments')
+= render partial: 'comments/comments', locals: { object: @news_item }

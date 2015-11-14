@@ -1,4 +1,5 @@
 class Attachment < ActiveRecord::Base
+  include Concerns::FileImage
 
   include Authority::Abilities
   self.authorizer_name = 'AttachmentAuthorizer'
@@ -18,32 +19,11 @@ class Attachment < ActiveRecord::Base
   validates_attachment_size :file, less_than: PAPERCLIP_FILE_MAX_SIZE
 
   def visible_to?(person)
-    (message and person.can_see?(message))
+    (message and person.can_read?(message))
   end
 
   def human_name
     name.split('.').first.humanize
-  end
-
-  def image
-    return @img unless @img.nil?
-    if img = MiniMagick::Image.new(file.path) and img.valid?
-      @img = img
-    else
-      @img = false
-    end
-  end
-
-  def image?
-    image and %w(JPEG PNG GIF).include?(image[:format])
-  end
-
-  def width
-    image[:width] if image?
-  end
-
-  def height
-    image[:height] if image?
   end
 
   class << self

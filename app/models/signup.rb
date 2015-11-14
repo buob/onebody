@@ -20,6 +20,10 @@ class Signup
     end
   end
 
+  def email=(e)
+    @email = e.downcase
+  end
+
   def save
     return false unless valid?
     return true if validate_existing
@@ -33,8 +37,38 @@ class Signup
   end
 
   def save!
-    raise ArgumentError.new(errors.full_messages) unless valid?
+    raise ArgumentError.new(errors.values) unless valid?
     save
+  end
+
+  def self.save_with_omniauth(auth)
+    first_name = auth['info']['first_name']
+    last_name = auth['info']['last_name']
+
+    family ||= Family.create(
+      name:      "#{first_name} #{last_name}",
+      last_name: last_name
+    )
+
+    return false unless family.errors.empty?
+
+    person ||= Person.create(
+      provider:    auth['provider'],
+      uid:         auth['uid'],
+      first_name:  first_name,
+      last_name:   last_name,
+      email:       auth['info']['email'],
+      family:      family,
+      status:      :pending # FIXME I don't think this is right
+    )
+
+    case auth['provider']
+    when "facebook"
+      person.facebook_url = auth['info']['urls'][:Facebook]
+    end
+
+    return false unless person.errors.empty?
+    person
   end
 
   def verification_sent?
@@ -61,16 +95,16 @@ class Signup
 
   def validate_existing
     if @person = Person.where(email: email).first
-      if @person.can_sign_in? or !sign_up_approval_required?
-        @person.update_attributes(can_sign_in: true, full_access: true) unless sign_up_approval_required?
+      if @person.able_to_sign_in? || !sign_up_approval_required?
+        @person.update_attributes(status: :active) unless sign_up_approval_required?
         @family = @person.family
         @found_existing = true
         create_and_deliver_email_verification
         true
       end
-    elsif @person = Person.where(mobile_phone: mobile_phone.digits_only).first and @person.can_sign_in?
-      if @person.can_sign_in? or !sign_up_approval_required?
-        @person.update_attributes(can_sign_in: true, full_access: true) unless sign_up_approval_required?
+    elsif (@person = Person.where(mobile_phone: mobile_phone.digits_only).first) && @person.able_to_sign_in?
+      if @person.able_to_sign_in? || !sign_up_approval_required?
+        @person.update_attributes(status: :active) unless sign_up_approval_required?
         @family = @person.family
         @can_verify_mobile = true
         @found_existing = true
@@ -95,21 +129,22 @@ class Signup
       birthday: birthday,
       gender: gender,
       mobile_phone: mobile_phone,
-      can_sign_in: full_access?,
-      full_access: full_access?,
-      visible_to_everyone: full_access?,
-      visible_on_printed_directory: full_access?
+      status: status
     )
     @person.errors.empty?
   end
 
   def deliver_signup_approval
-    Notifier.pending_sign_up(@person).deliver
+    Notifier.pending_sign_up(@person).deliver_now
     @approval_sent = true
   end
 
-  def full_access?
-    !sign_up_approval_required?
+  def status
+    if sign_up_approval_required?
+      :inactive
+    else
+      :active
+    end
   end
 
   def create_and_deliver_email_verification
@@ -122,7 +157,9 @@ class Signup
   end
 
   def validate_adult
-    unless Person.new(birthday: @birthday).adult?
+    person = Person.new(birthday: @birthday)
+    person.set_child
+    unless person.adult?
       errors.add(:birthday, :too_young)
     end
   end

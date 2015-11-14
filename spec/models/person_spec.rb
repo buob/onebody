@@ -1,17 +1,15 @@
-require_relative '../spec_helper'
-
-GLOBAL_SUPER_ADMIN_EMAIL = 'support@example.com' unless defined?(GLOBAL_SUPER_ADMIN_EMAIL) and GLOBAL_SUPER_ADMIN_EMAIL == 'support@example.com'
+require_relative '../rails_helper'
 
 describe Person do
 
   describe 'Formats' do
 
-    BAD_EMAIL_ADDRESSES  = ['bad address@example.com', 'bad~address@example.com', 'baddaddress@example.123']
-    GOOD_EMAIL_ADDRESSES = ['bob@example.com', 'abcdefghijklmnopqrstuvwxyz0123456789._%-@abcdefghijklmnopqrstuvwxyz0123456789.-.com']
+    BAD_EMAIL_ADDRESSES  = ['bad address@example.com', 'bad~address@example.com', 'baddaddress@example.123', 'looksinnocent@example.com\n<script>alert("pwned")</script>']
+    GOOD_EMAIL_ADDRESSES = ['bob@example.com', 'abcdefghijklmnopqrstuvwxyz0123456789._%-@abcdefghijklmnopqrstuvwxyz0123456789.-.com', 'admin@newhorizon.church']
     BAD_WEB_ADDRESSES    = ['www.badaddress.com', 'ftp://badaddress.org', "javascript://void(alert('do evil stuff'))"]
     GOOD_WEB_ADDRESSES   = ['http://www.goodwebsite.org', 'http://goodwebsite.com/a/path?some=args']
 
-    setup { @person = FactoryGirl.create(:person) }
+    before { @person = FactoryGirl.create(:person) }
 
     it 'should not allow bad email' do
       BAD_EMAIL_ADDRESSES.each do |address|
@@ -74,6 +72,14 @@ describe Person do
     end
   end
 
+  it 'should allow good facebook_url' do
+    should allow_value('https://www.facebook.com/seven1m').for(:facebook_url)
+  end
+
+  it 'should not allow bad facebook_url' do
+    should_not allow_value('http://notfacebook.com/foo').for(:facebook_url)
+  end
+
   context 'Email Address Sharing' do
 
     it 'should allow people in the same family to have the same email address' do
@@ -100,11 +106,12 @@ describe Person do
 
     it 'should know of basic group memberships' do
       @group.memberships.create! person: @person
-      expect(@person.member_of?(@group)).to be
-      expect(@person2.member_of?(@group)).to be_nil
+      expect(@person.member_of?(@group)).to eq(true)
+      expect(@person2.member_of?(@group)).to eq(false)
     end
 
     it 'should know about linked group memberships' do
+      @group.membership_mode = 'link_code'
       @group.link_code = 'B345'
       @group.save!
       @person.classes = 'A123,B345,C567'
@@ -117,7 +124,7 @@ describe Person do
     it 'should know about parent_of group memberships via basic group membership' do
       @child = FactoryGirl.create(:person, family: @person.family, child: true)
       @group.memberships.create! person: @child
-      @parent_group = FactoryGirl.create(:group, parents_of: @group.id)
+      @parent_group = FactoryGirl.create(:group, membership_mode: 'parents_of', parents_of: @group.id)
       @parent_group.update_memberships
       expect(@person.member_of?(@parent_group)).to be
       expect(@person2.member_of?(@parent_group)).not_to be
@@ -125,12 +132,13 @@ describe Person do
 
     it 'should know about parent_of group memberships via linked group membership' do
       @child = FactoryGirl.create(:person, family: @person.family, child: true)
+      @group.membership_mode = 'link_code'
       @group.link_code = 'B345'
       @group.save!
       @child.classes = 'A123,B345,C567'
       @child.save!
       @group.update_memberships
-      @parent_group = FactoryGirl.create(:group, parents_of: @group.id)
+      @parent_group = FactoryGirl.create(:group, membership_mode: 'parents_of', parents_of: @group.id)
       @parent_group.update_memberships
       expect(@person.member_of?(@parent_group)).to be
       expect(@person2.member_of?(@parent_group)).not_to be
@@ -138,12 +146,80 @@ describe Person do
 
   end
 
-  it "should mark email_changed when email address changes" do
-    @person = FactoryGirl.create(:person)
-    @person.email = 'newaddress@example.com'
-    expect(@person).to_not be_email_changed
+  it 'should remove @ from twitter username' do
+    @person = FactoryGirl.build(:person)
+    @person.twitter = "@username"
     @person.save
-    expect(@person).to be_email_changed
+    expect(@person.twitter).to eq("username")
+  end
+
+  it "should not accept twitter username with more than 15 characters" do
+    should_not allow_value("fifteencharacter").for(:twitter)
+  end
+
+  it "should accept twitter username with at most 15 characters" do
+    should allow_value("fifteencharacte").for(:twitter)
+  end
+
+  it "should not accept twitter username with symbols" do
+    should_not allow_value("foo!").for(:twitter)
+  end
+
+  it "should accept twitter username with alphanumeric characters" do
+    should allow_value("User_Name123").for(:twitter)
+  end
+
+  describe '#email_changed' do
+    context 'email address is changed' do
+      let(:person) { FactoryGirl.create(:person) }
+
+      before do
+        person.email = 'newaddress@example.com'
+        expect(person.email_changed).to eq(false)
+        person.save
+      end
+
+      it 'sets email_changed to true' do
+        expect(person.email_changed).to eq(true)
+      end
+
+      it 'sends an email' do
+        email = ActionMailer::Base.deliveries.last
+        expect(email.subject).to eq('John Smith Changed Email')
+      end
+    end
+
+    context 'email address is changed, but the "Send Email Changes To" setting is blank' do
+      let(:person) { FactoryGirl.create(:person) }
+
+      before do
+        Setting.set(:contact, :send_email_changes_to, '')
+        person.email = 'newaddress@example.com'
+        person.save
+      end
+
+      it 'does not send an email' do
+        expect(ActionMailer::Base.deliveries).to be_empty
+      end
+
+      after do
+        Setting.set(:contact, :send_email_changes_to, 'admin@example.com')
+      end
+    end
+
+    context 'email address is changed, but dont_mark_email_changed=true' do
+      let(:person) { FactoryGirl.create(:person) }
+
+      before do
+        person.dont_mark_email_changed = true
+        person.email = 'newaddress@example.com'
+        person.save
+      end
+
+      it 'does not set email_changed' do
+        expect(person.email_changed).to eq(false)
+      end
+    end
   end
 
   it 'should lowercase email' do
@@ -156,19 +232,6 @@ describe Person do
     @person = FactoryGirl.build(:person)
     @person.alternate_email = 'TEST@example.COM'
     expect(@person.alternate_email).to eq("test@example.com")
-  end
-
-  it "should generate a custom directory pdf" do
-    @person = FactoryGirl.create(:person)
-    expect(@person.generate_directory_pdf.to_s[0..100]).to match(/PDF\-1\.3/)
-  end
-
-  it "should know when a birthday is coming up" do
-    @person = FactoryGirl.create(:person)
-    @person.update_attributes!(birthday: Time.now + 5.days - 27.years)
-    expect(@person.reload).to be_birthday_soon
-    @person.update_attributes!(birthday: Time.now - 27.years + (BIRTHDAY_SOON_DAYS + 1).days)
-    expect(@person.reload).to_not be_birthday_soon
   end
 
   it "should not tz convert a birthday" do
@@ -238,12 +301,14 @@ describe Person do
     it "sets child=true when birthday is set and person is < 18 years old" do
       @person = FactoryGirl.build(:person, child: false)
       @person.birthday = 17.years.ago
+      @person.valid? # trigger callback
       expect(@person.child).to eq(true)
     end
 
     it "sets child=false when birthday is set and person is >= 18 years old" do
       @person = FactoryGirl.build(:person, child: true)
       @person.birthday = 18.years.ago
+      @person.valid? # trigger callback
       expect(@person.child).to eq(false)
     end
 
@@ -254,23 +319,20 @@ describe Person do
       @person.save
       expect(@person.errors[:child]).to_not be_empty
     end
+
+     it 'should allow child=true while birthday year is 1900' do
+      @person = FactoryGirl.create(:person)
+      @person.birthday = Date.new(1900, 1, 1)
+      @person.child = false
+      @person.save
+      expect(@person.reload.child).to eq(false)
+     end
   end
 
   it "should guess last_name upon initialization" do
     @family = FactoryGirl.create(:family, last_name: 'Smith')
     @person = @family.people.new
     expect(@person.last_name).to eq("Smith")
-  end
-
-  it "should select a proper sequence within the family if none is specified" do
-    @person = FactoryGirl.create(:person)
-    @person2 = FactoryGirl.create(:person, family: @person.family)
-    expect(@person2.family_id).to eq(@person.family_id)
-    expect(@person.sequence).to eq(1)
-    expect(@person2.sequence).to eq(2)
-    @person2.sequence = nil
-    @person2.save
-    expect(@person2.sequence).to eq(2)
   end
 
   it "should know if it is a super admin" do
@@ -283,15 +345,12 @@ describe Person do
     @person3 = FactoryGirl.create(:person, admin: Admin.create(super_admin: true))
     expect(@person3).to be_admin
     expect(@person3).to be_super_admin
-    @person4 = FactoryGirl.create(:person, email: 'support@example.com')
-    expect(@person4).to be_admin
-    expect(@person4).to be_super_admin
   end
 
   it "should properly translate validation errors" do
     @person = FactoryGirl.create(:person)
     expect(@person.update_attributes(website: 'bad/address')).to eq(false)
-    expect(@person.errors.full_messages).to eq([I18n.t("activerecord.errors.models.person.attributes.website.invalid")])
+    expect(@person.errors[:website]).to eq([I18n.t("activerecord.errors.models.person.attributes.website.invalid")])
   end
 
   context '#authenticate' do
@@ -383,14 +442,254 @@ describe Person do
     end
   end
 
-  private
+  describe '#create_as_stream_item' do
+    let!(:person) { FactoryGirl.create(:person) }
 
-    def partial_fixture(table, name, valid_attributes)
-      YAML::load(File.open(Rails.root.join("spec/fixtures/#{table}.yml")))[name].tap do |fixture|
-        fixture.delete_if { |key, val| !valid_attributes.include? key }
-        fixture.each do |key, val|
-          fixture[key] = val.to_s
-        end
+    it 'creates a new stream item' do
+      expect(StreamItem.last.attributes).to include(
+        'title'     => person.name,
+        'person_id' => person.id
+      )
+    end
+  end
+
+  describe '#update_stream_item' do
+    let!(:person) { FactoryGirl.create(:person) }
+    let(:stream_item_spy) { spy('stream_item') }
+
+    before do
+      allow(person).to receive(:stream_item).and_return(stream_item_spy)
+    end
+
+    context 'given no relevant changes' do
+      before do
+        person.reload
+        person.email = 'new@example.com'
+        person.save!
+      end
+
+      it 'does not update the stream item' do
+        expect(stream_item_spy).not_to have_received(:save!)
       end
     end
+
+    context 'given the email went away' do
+      before do
+        person.reload
+        person.email = ''
+        person.save!
+      end
+
+      it 'updates the stream item' do
+        expect(stream_item_spy).to have_received(:save!)
+      end
+    end
+
+    context 'given the name changed' do
+      before do
+        person.reload
+        person.suffix = 'Jr.'
+        person.save!
+      end
+
+      it 'updates the stream item' do
+        expect(stream_item_spy).to have_received(:save!)
+      end
+    end
+  end
+
+  describe '#position' do
+    context 'given a family with three people in it' do
+      let!(:family) { FactoryGirl.create(:family) }
+      let!(:head)   { FactoryGirl.create(:person, family: family, child: false, first_name: 'Tim',    last_name: 'Morgan') }
+      let!(:spouse) { FactoryGirl.create(:person, family: family, child: false, first_name: 'Jennie', last_name: 'Morgan') }
+      let!(:child)  { FactoryGirl.create(:person, family: family, child: true,  first_name: 'Mac',    last_name: 'Morgan') }
+
+      it 'can be reordered' do
+        head.insert_at(3)
+
+        expect(spouse.reload.position).to eq(1)
+        expect(child.reload.position).to eq(2)
+        expect(head.reload.position).to eq(3)
+      end
+    end
+  end
+
+  describe '#primary_emailer=' do
+    context 'setting to true on one family member when other already has it set' do
+      let(:husband) { FactoryGirl.create(:person, first_name: 'John', email: 'shared@example.com', primary_emailer: true) }
+      let(:spouse)  { FactoryGirl.create(:person, first_name: 'Jane', email: 'shared@example.com', family: husband.family) }
+
+      it 'sets the value to false on others with the same email' do
+        spouse.primary_emailer = true
+        spouse.save
+        expect(spouse.reload).to be_primary_emailer
+        expect(husband.reload).to_not be_primary_emailer
+      end
+    end
+  end
+
+  describe '#destroy' do
+    let(:person) { FactoryGirl.create(:person) }
+
+    it 'destroys the associated stream_item' do
+      expect(person.stream_item).to be
+      person.destroy
+      expect { person.stream_item.reload }.to raise_error(ActiveRecord::RecordNotFound)
+    end
+  end
+
+  describe '#suffix=' do
+    let(:person) { FactoryGirl.build(:person) }
+
+    it 'sets to nil if blank' do
+      person.suffix = ''
+      person.valid? # trigger callback
+      expect(person.suffix).to be_nil
+    end
+  end
+
+  describe '#gender=' do
+    let(:person) { FactoryGirl.build(:person) }
+
+    it 'sets to nil if blank' do
+      person.gender = ''
+      person.valid? # trigger callback
+      expect(person.gender).to be_nil
+    end
+
+    it 'sets with capital letter' do
+      person.gender = 'male'
+      person.valid? # trigger callback
+      expect(person.gender).to eq('Male')
+    end
+  end
+
+  describe '#update_feed_code' do
+    let(:existing) { FactoryGirl.create(:person) }
+    let(:person)   { FactoryGirl.build(:person) }
+
+    context 'given a collision in code generation' do
+      before do
+        existing.update_attribute(:feed_code, 'abc123')
+        person.family.save # saving the family calls SecureRandom.hex in the GeocoderJob, so get that out of the way
+        allow(SecureRandom).to receive(:hex).and_return('abc123', 'xyz987')
+      end
+
+      it 'generates a new code until it is unique' do
+        person.save!
+        expect(SecureRandom).to have_received(:hex).with(50).twice
+        expect(person.feed_code).to eq('xyz987')
+      end
+    end
+  end
+
+  describe '#relationships=' do
+    context 'given a string' do
+      let(:person) { FactoryGirl.build(:person) }
+      let(:child)  { FactoryGirl.create(:person, legacy_id: 1001) }
+      let(:father) { FactoryGirl.create(:person, legacy_id: 1002) }
+      let(:neighbor) { FactoryGirl.create(:person, legacy_id: 1003) }
+
+      before do
+        person.relationships = "#{father.legacy_id}[father],#{child.legacy_id}[Son],#{neighbor.legacy_id}[Neighbor]"
+      end
+
+      it 'sets the attributes' do
+        expect(person.relationships.map(&:attributes)).to match_array([
+          include('name' => 'father', 'other_name' => nil,        'related_id' => father.id),
+          include('name' => 'son',    'other_name' => nil,        'related_id' => child.id),
+          include('name' => 'other',  'other_name' => 'Neighbor', 'related_id' => neighbor.id)
+        ])
+      end
+    end
+  end
+
+  describe '#update_relationships_hash' do
+    let(:person) { FactoryGirl.build(:person) }
+
+    context 'given no relationships' do
+      it 'generates a sha1 hash of an empty string' do
+        person.update_relationships_hash
+        expect(person.relationships_hash).to eq(Digest::SHA1.hexdigest(''))
+      end
+    end
+
+    context 'given a relationship' do
+      let(:mother) { FactoryGirl.create(:person, legacy_id: 111) }
+
+      before do
+        person.save!
+        person.relationships.create!(related: mother, name: 'mother')
+      end
+
+      it 'generates a sha1 hash of of the legacy_id and relationship name' do
+        person.update_relationships_hash
+        expect(person.relationships_hash).to eq(Digest::SHA1.hexdigest('111[Mother]'))
+      end
+    end
+  end
+
+  describe '#business_categories' do
+    before do
+      FactoryGirl.create_list(:person, 2, business_category: 'foo')
+    end
+
+    it 'returns an array of unique category names' do
+      expect(Person.business_categories).to eq(['foo'])
+    end
+  end
+
+  describe '#custom_types' do
+    before do
+      FactoryGirl.create_list(:person, 2, custom_type: 'foo')
+    end
+
+    it 'returns an array of unique type names' do
+      expect(Person.custom_types).to eq(['foo'])
+    end
+  end
+
+  describe 'admin records deleted after person is destroyed' do
+    context 'admin user is destroyed' do
+      let!(:person) { FactoryGirl.create(:person, :admin_edit_profiles) }
+      let!(:admin)  { person.admin }
+
+      before do
+        person.destroy
+      end
+
+      it 'deletes the admin record' do
+        expect { admin.reload }.to raise_error(ActiveRecord::RecordNotFound)
+      end
+    end
+
+    context 'admin user is destroyed for real' do
+      let!(:person) { FactoryGirl.create(:person, :admin_edit_profiles) }
+      let!(:admin)  { person.admin }
+
+      before do
+        person.destroy_for_real
+      end
+
+      it 'deletes the admin record' do
+        expect { admin.reload }.to raise_error(ActiveRecord::RecordNotFound)
+      end
+    end
+  end
+
+  context '#generate_directory_pdf' do
+    let(:person) do
+      FactoryGirl.create(
+        :person,
+        mobile_phone: '1234567890',
+        status: :active
+      )
+    end
+
+    it 'generates a pdf' do
+      data = person.generate_directory_pdf.to_s
+      expect(data).to match(/\A%PDF\-1\.3/)
+    end
+  end
 end

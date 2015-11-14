@@ -62,10 +62,6 @@ class Admin < ActiveRecord::Base
       end
     end
     alias_method :add_privilege, :add_privileges
-
-    def destroy_orphaned
-      destroy_all '(select count(*) from people where people.admin_id = admins.id and people.deleted = 0) = 0 and template_name is null'
-    end
   end
 
   add_privileges *%w(
@@ -78,10 +74,8 @@ class Admin < ActiveRecord::Base
     manage_comments
     manage_groups
     manage_news
-    manage_notes
     manage_pictures
     manage_prayer_signups
-    manage_sync
     manage_updates
     view_hidden_profiles
     view_hidden_properties
@@ -89,6 +83,8 @@ class Admin < ActiveRecord::Base
     assign_checkin_cards
     manage_checkin
     manage_documents
+    run_reports
+    manage_reports
   )
 
   Dir["#{Rails.root}/plugins/**/config/privileges.rb"].each do |path|

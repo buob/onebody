@@ -23,9 +23,11 @@ class BreadcrumbPresenter
     news_crumb
     verse_crumb
     prayer_request_crumb
-    note_crumb
     admin_crumb
     document_crumb
+    task_crumb
+    reports_crumb
+    imports_crumb
   end
 
   private
@@ -99,7 +101,7 @@ class BreadcrumbPresenter
         else
           crumbs << ['fa fa-camera-retro', t('nav.albums'), group_albums_path(album.owner_id)]
         end
-      elsif album.owner_type == 'Group'
+      elsif album.owner_type == 'Person'
         if @route == 'pictures#show'
           crumbs << ['fa fa-camera-retro', album.name, person_album_path(album.owner_id, album)]
         else
@@ -133,14 +135,8 @@ class BreadcrumbPresenter
     end
   end
 
-  def note_crumb
-    if @assigns['note'] and person
-      crumbs << ['fa fa-file', t('nav.notes'), person_notes_path(person)]
-    end
-  end
-
   def admin_crumb
-    if @controller =~ /^administration\// or @controller == 'pages' or @route == 'people#import'
+    if @controller =~ /^administration\// or @controller == 'pages'
       crumbs << ['fa fa-gear', t('nav.admin'), admin_path]
     end
     if @controller == 'administration/admins' and @assigns['admin']
@@ -149,13 +145,12 @@ class BreadcrumbPresenter
     if @controller == 'pages' and @assigns['page']
       crumbs << ['fa fa-file', t('nav.pages'), pages_path]
     end
-    if @controller == 'administration/syncs' and @assigns['sync']
-      crumbs << ['fa fa-refresh', t('nav.syncs'), administration_syncs_path]
-    end
-    if @controller =~ %r(^administration/checkin/(times|cards|groups))
+    if @controller =~ %r(^administration/checkin/(times|cards|groups|labels))
       crumbs << ['fa fa-check-square-o', t('nav.checkin'), administration_checkin_dashboard_path]
       if @route == 'administration/checkin/groups#index' and @assigns['time']
         crumbs << ['fa fa-clock-o', t('nav.checkin_sub.times'), administration_checkin_times_path]
+      elsif @route =~ %r(administration/checkin/labels#(new|edit))
+        crumbs << ['fa fa-tags', t('nav.checkin_sub.labels'), administration_checkin_labels_path]
       end
     end
   end
@@ -174,6 +169,25 @@ class BreadcrumbPresenter
         @crumbs << ['fa fa-files-o', 'Documents', documents_path]
         @crumbs += folders
       end
+    end
+  end
+
+  def task_crumb
+    if @controller == 'tasks' and group
+      crumbs << ['fa fa-check-square', t('nav.tasks'), group_tasks_path(group)] unless @action == 'index'
+    end
+  end
+
+  def reports_crumb
+    if @controller == 'dossier/reports' or @controller == 'custom_reports'
+      crumbs << ['fa fa-gear', t('nav.admin'), admin_path]
+      crumbs << ['fa fa-table', t('nav.report'), admin_reports_path]
+    end
+  end
+
+  def imports_crumb
+    if @controller == 'administration/imports'
+      crumbs << ['fa fa-upload', t('nav.imports'), administration_imports_path]
     end
   end
 

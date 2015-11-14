@@ -1,4 +1,4 @@
-require_relative '../spec_helper'
+require_relative '../rails_helper'
 
 describe Family do
 
@@ -115,90 +115,174 @@ describe Family do
     end
   end
 
-  describe '#reorder' do
-    context 'given a family with three people' do
-      subject { FactoryGirl.create(:family) }
+  describe '#name' do
+    before do
+      @family = FactoryGirl.create(:family)
+    end
 
-      let!(:head)   { FactoryGirl.create(:person, family: subject, child: false, first_name: "Tim",    last_name: "Morgan") }
-      let!(:spouse) { FactoryGirl.create(:person, family: subject, child: false, first_name: "Jennie", last_name: "Morgan") }
-      let!(:child)  { FactoryGirl.create(:person, family: subject, child: true,  first_name: "Mac",    last_name: "Morgan") }
-
-      context 'given direction up' do
-        before do
-          subject.reorder_person(spouse, 'up')
-        end
-
-        it 'changes the order' do
-          expect(spouse.reload.sequence).to eq(1)
-          expect(head.reload.sequence).to eq(2)
-          expect(child.reload.sequence).to eq(3)
-        end
+    context 'family name is empty' do
+      before do
+        @family.name = nil
       end
 
-      context 'given direction up and person is already first' do
-        before do
-          subject.reorder_person(head, 'up')
-        end
-
-        it 'does not change the order' do
-          expect(head.reload.sequence).to eq(1)
-          expect(spouse.reload.sequence).to eq(2)
-          expect(child.reload.sequence).to eq(3)
-        end
-      end
-
-      context 'given direction up and sequences are invalid and there is a deleted person' do
-        before do
-          child.destroy
-          @new_child = FactoryGirl.create(:person, family: subject, child: true)
-          subject.people.update_all(sequence: 2)
-          expect(subject.people.reload.undeleted).to eq([head, spouse, @new_child]) # database order
-          subject.reorder_person(@new_child.reload, 'up')
-        end
-
-        it 'fixes sequence numbers' do
-          expect(head.reload.sequence).to eq(1)
-          expect(@new_child.reload.sequence).to eq(2)
-          expect(spouse.reload.sequence).to eq(3)
-        end
-      end
-
-      context 'given direction down' do
-        before do
-          subject.reorder_person(spouse, 'down')
-        end
-
-        it 'changes the order' do
-          expect(head.reload.sequence).to eq(1)
-          expect(child.reload.sequence).to eq(2)
-          expect(spouse.reload.sequence).to eq(3)
-        end
-      end
-
-      context 'given direction down and person is already last' do
-        before do
-          subject.reorder_person(child, 'down')
-        end
-
-        it 'does not change the order' do
-          expect(head.reload.sequence).to eq(1)
-          expect(spouse.reload.sequence).to eq(2)
-          expect(child.reload.sequence).to eq(3)
-        end
-      end
-
-      context 'given invalid direction' do
-        before do
-          subject.reorder_person(child, 'sideways')
-        end
-
-        it 'does not change the order' do
-          expect(head.reload.sequence).to eq(1)
-          expect(spouse.reload.sequence).to eq(2)
-          expect(child.reload.sequence).to eq(3)
-        end
+      it 'should be invalid' do
+        expect(@family).to be_invalid
       end
     end
   end
 
+  describe '#last_name' do
+    before do
+      @family = FactoryGirl.create(:family)
+    end
+
+    context 'family last name is empty' do
+      before do
+        @family.last_name = nil
+      end
+
+      it 'should be invalid' do
+        expect(@family).to be_invalid
+      end
+    end
+  end
+
+  describe 'country' do
+    context 'default country is New Zealand' do
+      before do
+        Setting.set(:system, :default_country, 'NZ')
+      end
+
+      it 'sets the country on a new family' do
+        expect(Family.new.country).to eq('NZ')
+      end
+    end
+  end
+
+  describe '#anniversary_sharable_with' do
+    let(:husband) { FactoryGirl.create(:person) }
+    let(:wife) { FactoryGirl.create(:person, family: husband.family) }
+
+    context 'two adults in family with same wedding anniversary' do
+      before do
+        husband.update_attribute(:anniversary, Date.new(2001, 11, 22))
+        wife.update_attribute(:anniversary, Date.new(2001, 11, 22))
+      end
+
+      it 'shows their shared anniversary' do
+        anniversary = husband.family.anniversary_sharable_with(husband)
+        expect(anniversary).to eq(Date.new(2001, 11, 22))
+      end
+    end
+
+    context 'two adults in family with different wedding anniversaries' do
+      before do
+        husband.update_attribute(:anniversary, Date.new(2001, 11, 22))
+        wife.update_attribute(:anniversary, Date.new(2001, 10, 20))
+      end
+
+      it 'does not show their anniversary' do
+        anniversary = husband.family.anniversary_sharable_with(husband)
+        expect(anniversary).to be_nil
+      end
+    end
+
+    context 'one adult in family with a wedding anniversary' do
+      before do
+        husband.update_attribute(:anniversary, Date.new(2001, 11, 22))
+        wife.destroy
+      end
+
+      it 'shows the anniversary' do
+        anniversary = husband.family.anniversary_sharable_with(husband)
+        expect(anniversary).to eq(Date.new(2001, 11, 22))
+      end
+    end
+  end
+
+  describe '#geocoding_address' do
+    let(:family) do
+      FactoryGirl.create(
+        :family,
+        address1: '650 S. Peoria',
+        city: 'Tulsa',
+        state: 'OK',
+        zip: '74120',
+        country: 'US'
+      )
+    end
+
+    it 'appends the country name on the end' do
+      expect(family.geocoding_address).to eq('650 S. Peoria, Tulsa, OK, 74120, US')
+    end
+  end
+
+  describe 'geocoding' do
+    context 'family with address' do
+      let(:family) do
+        FactoryGirl.create(
+          :family,
+          address1: '650 S. Peoria',
+          city: 'Tulsa',
+          state: 'OK',
+          zip: '74120',
+          country: 'US'
+        )
+      end
+
+      before do
+        Geocoder::Lookup::Test.add_stub(
+          '650 S. Peoria, Tulsa, OK, 74120, US', [
+            {
+              'latitude'     => 36.151305,
+              'longitude'    => -95.975393,
+              'address'      => 'Tulsa, OK, USA',
+              'state'        => 'Oklahoma',
+              'state_code'   => 'OK',
+              'country'      => 'United States',
+              'country_code' => 'US'
+            }
+          ]
+        )
+      end
+
+      it 'sets latitude and longitude' do
+        expect(family.reload.attributes).to include(
+          'latitude'  => within(0.00001).of(36.151305),
+          'longitude' => within(0.00001).of(-95.975393)
+        )
+      end
+
+      context 'address is removed' do
+        before do
+          family.address1 = ''
+          family.city = ''
+          family.state = ''
+          family.zip = ''
+          family.save!
+        end
+
+        it 'removes latitude and longitude' do
+          expect(family.latitude).to be_nil
+          expect(family.longitude).to be_nil
+        end
+      end
+
+      context 'unrelated attribute is changed' do
+        before do
+          family # create family
+          Geocoder::Lookup::Test.reset
+          family.name = 'Jack Smith'
+          family.save!
+        end
+
+        it 'does not change the latitude or longitude' do
+          expect(family.reload.attributes).to include(
+            'latitude'  => within(0.00001).of(36.151305),
+            'longitude' => within(0.00001).of(-95.975393)
+          )
+        end
+      end
+    end
+  end
 end

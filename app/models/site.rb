@@ -1,38 +1,25 @@
 class Site < ActiveRecord::Base
-
-  class << self
-    def sub_tables
-      rejects = %w(site search notifier one_body_info tagging signin_failure processed_message)
-      @@sub_tables ||= Dir[File.join(File.dirname(__FILE__), '*.rb')].to_a.map { |f| File.split(f).last.split('.').first }.select { |f| !rejects.include? f }.map { |f| f.pluralize }
-    end
-    def sub_models
-      @@sub_models ||= sub_tables.map { |t| eval(t.classify) }
-    end
-  end
-
-  Site.sub_tables.each { |n| has_many n.to_sym, dependent: :delete_all }
-
+  has_many :settings, dependent: :delete_all
   has_one :stream_item, as: :streamable
 
-  cattr_accessor :current
+  def self.current
+    Thread.current[:site]
+  end
+
+  def self.current=(site)
+    Thread.current[:site] = site
+  end
+
+  def self.with_current(site)
+    was = Thread.current[:site]
+    Thread.current[:site] = site
+    yield
+    Thread.current[:site] = was
+  end
 
   validates_presence_of :name, :host
   validates_uniqueness_of :name, :host
   validates_format_of :host, without: /\A(https?:\/\/|www\.)/
-  do_not_validate_attachment_file_type :logo
-
-  has_attached_file :logo,
-    path:          ":rails_root/public/system/:rails_env/:class/:attachment/:id/:style/:fingerprint.:extension",
-    url:           "/system/:rails_env/:class/:attachment/:id/:style/:fingerprint.:extension",
-    styles:        {
-      tn:          '32x32#',
-      small:       '75x75>',
-      medium:      '150x150>',
-      layout:      '300x80>',
-      large:       '400x400>',
-      original:    '800x800>'
-    },
-    default_url:   "/images/missing_:style.png"
 
   def create_as_stream_item
     StreamItem.create!(
@@ -75,10 +62,6 @@ class Site < ActiveRecord::Base
     settings.where(section: "Name", name: "Site").first.value rescue nil
   end
 
-  def count_people
-    connection.select_value("SELECT count(*) from people where site_id=#{id}").to_i
-  end
-
   def enabled?
     Setting.get(:features, :multisite) or default?
   end
@@ -86,9 +69,10 @@ class Site < ActiveRecord::Base
   after_update :update_url
 
   def update_url
-    if setting = self.settings.where(section: "URL", name: "Site").first
-      setting.update_attributes!(value: "http://#{host}/")
-    end
+    return unless (setting = settings.where(section: 'URL', name: 'Site').first)
+    scheme = Setting.get(:features, :ssl) ? 'https' : 'http'
+    setting.update_attributes!(value: "#{scheme}://#{host}/")
+    Setting.precache_settings(true)
   end
 
   after_create :add_settings, :add_pages
@@ -134,16 +118,14 @@ class Site < ActiveRecord::Base
   end
 
   alias_method :rails_original_destroy, :destroy
+
   def destroy
-    raise 'This is such a destructive method that it has been renamed to destroy_for_sure for your safety.'
+    fail 'This is such a destructive method that it has been renamed to destroy_for_real for your safety.'
   end
-  def destroy_for_sure
-    raise 'You cannot delete the default site (ID=1).' if default?
-    # TO DO: this is messy
-    was = Site.current
-    Site.current = self
+
+  def destroy_for_real
+    fail 'You cannot delete the default site (ID=1).' if default?
     rails_original_destroy
-    Site.current = was
   end
 
   class << self

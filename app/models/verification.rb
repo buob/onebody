@@ -12,8 +12,8 @@ class Verification < ActiveRecord::Base
   validates :criteria, presence: true
   validates :carrier, inclusion: MOBILE_GATEWAYS.keys, if: -> { mobile_phone }
   validate :validate_max_attempts, on: :create
-  validate :validate_people, if: -> { email or mobile_phone }
-  validate :validate_people_can_sign_in, if: -> { email or mobile_phone }
+  validate :validate_people, if: -> { email || mobile_phone }
+  validate :validate_people_able_to_sign_in, if: -> { email || mobile_phone }
 
   blank_to_nil :mobile_phone, :email
 
@@ -24,12 +24,10 @@ class Verification < ActiveRecord::Base
     end
   end
 
-  def validate_people_can_sign_in
-    if people.any?
-      unless people.any?(&:can_sign_in?)
-        errors.add(:base, :unauthorized)
-      end
-    end
+  def validate_people_able_to_sign_in
+    return if people.none?
+    return if people.any?(&:able_to_sign_in?)
+    errors.add(:base, :unauthorized)
   end
 
   def criteria(for_verification=false)
@@ -71,14 +69,21 @@ class Verification < ActiveRecord::Base
   def send_verification_email
     if verified.nil?
       if mobile_phone
-        Notifier.mobile_verification(self).deliver
+        Notifier.mobile_verification(self).deliver_now
       else
-        Notifier.email_verification(self).deliver
+        Notifier.email_verification(self).deliver_now
       end
     end
+  rescue Errno::ECONNREFUSED => e
+    raise EmailConnectionError, e.message
+  end
+
+  def check(param)
+    pending? and param.to_i == code
   end
 
   def check!(param)
+    return false unless pending?
     self.verified = (param.to_i == code and people.any?)
     save!
     self.verified

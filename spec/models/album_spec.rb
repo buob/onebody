@@ -1,9 +1,33 @@
-require_relative '../spec_helper'
+require_relative '../rails_helper'
 
 describe Album do
 
   before do
     @album = FactoryGirl.create(:album)
+  end
+
+  context '#name' do
+    context 'album name is empty' do
+      before do
+        @album.name = nil
+      end
+
+      it 'should be invalid' do
+        expect(@album).to be_invalid
+      end
+    end
+  end
+
+  context '#owner' do
+    context 'album owner is empty' do
+      before do
+        @album.owner = nil
+      end
+
+      it 'should be invalid' do
+        expect(@album).to be_invalid
+      end
+    end
   end
 
   context '#cover' do
@@ -98,6 +122,33 @@ describe Album do
 
       it 'should return nil' do
         expect(@album.person).to be_nil
+      end
+    end
+  end
+
+  context '#update_stream_item' do
+    context 'when the album is changed from private to public' do
+      let!(:user)    { FactoryGirl.create(:person) }
+      let!(:album)   { FactoryGirl.create(:album, is_public: true) }
+      let!(:picture) { FactoryGirl.create(:picture, album: album, person: user) }
+
+      it 'updates a stream item' do
+        expect {
+          album.is_public = false
+          album.save!
+        }.to change(album.stream_item.reload, :is_public?).from(true).to(false)
+      end
+    end
+  end
+
+  describe 'callbacks' do
+    context 'when the album is destroyed' do
+      let!(:album)   { FactoryGirl.create(:album, is_public: true) }
+      let!(:stream_item) { album.create_stream_item! }
+
+      it 'deletes the stream item' do
+        album.destroy
+        expect { stream_item.reload }.to raise_error(ActiveRecord::RecordNotFound)
       end
     end
   end

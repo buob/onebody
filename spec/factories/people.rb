@@ -6,10 +6,7 @@ FactoryGirl.define do
     sequence(:email) { |n| "jsmith#{n}@example.com" }
     password 'secret'
     child false
-    visible_to_everyone true
-    visible true
-    can_sign_in true
-    full_access true
+    status :active
     family
 
     trait :super_admin do
@@ -26,6 +23,14 @@ FactoryGirl.define do
 
     trait :admin_manage_groups do
       admin { Admin.create!(manage_groups: true) }
+    end
+
+    trait :admin_import_data do
+      admin { Admin.create!(import_data: true) }
+    end
+
+    trait :admin_manage_checkin do
+      admin { Admin.create!(manage_checkin: true) }
     end
 
     trait :with_business do

@@ -12,12 +12,13 @@ en:
     checkin: "Check-in"
     checkin_sub:
       times: "Times"
+      labels: "Labels"
     directory: "Directory"
     directory_sub:
       business: "Business Directory"
       printed: "Printed Directory"
       advanced: "Advanced Search"
-      new_family: "New Family"
+      new_person: "New Person"
     documents: "Documents"
     groups: "Groups"
     groups_sub:
@@ -31,6 +32,7 @@ en:
       new_count:
         one: "1 new"
         other: "%{count} new"
+    imports: "Imports"
     messages: "Messages"
     news: "News"
     notes: "Notes"
@@ -44,5 +46,10 @@ en:
       privacy: "Privacy"
       relationships: "Relationships"
       show: "View Profile"
-    syncs: "Syncs"
+    report: "Reporting"
     verses: "Verses"
+    tasks: "Tasks"
+    tasks_sub:
+      assigned_count:
+        one: "1 assigned"
+        other: "%{count} assigned"

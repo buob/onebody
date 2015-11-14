@@ -1,6 +1,6 @@
 class FamiliesController < ApplicationController
 
-  load_and_authorize_resource except: [:show, :hashify, :batch, :select, :schema]
+  load_and_authorize_resource except: [:show, :batch, :select]
 
   def index
     respond_to do |format|
@@ -29,8 +29,8 @@ class FamiliesController < ApplicationController
       @family = Family.where(id: params[:id], deleted: false).first
     end
     raise ActiveRecord::RecordNotFound unless @family
-    @people = @family.people.undeleted.to_a.select { |p| @logged_in.can_see?(p) }
-    if @logged_in.can_see?(@family)
+    @people = @family.people.undeleted.to_a.select { |p| @logged_in.can_read?(p) }
+    if @logged_in.can_read?(@family)
       respond_to do |format|
         format.html
         format.xml  { render xml: @family.to_xml } if can_export?
@@ -82,7 +82,7 @@ class FamiliesController < ApplicationController
         format.xml  { render xml: @family.errors, status: :unprocessable_entity } if can_export?
         format.js do # only used by barcode entry right now
           render :update do |page|
-            page.replace_html :notice, t('There_were_errors') + ":<br/>#{@family.errors.full_messages.join('; ')}"
+            page.replace_html :notice, t('There_were_errors') + ":<br/>#{@family.errors.values.join('; ')}"
             page[:notice].show
           end
         end
@@ -100,24 +100,6 @@ class FamiliesController < ApplicationController
     end
   end
 
-  def reorder
-    @family = Family.find(params[:id])
-    @family.reorder_person(@family.people.find(params[:person_id]), params[:direction])
-    redirect_to @family
-  end
-
-  def hashify
-    params.merge!(Hash.from_xml(request.body.read))
-    if @logged_in.admin?(:import_data) and Site.current.import_export_enabled?
-      ids = params[:hash][:legacy_id].to_s.split(',')
-      raise 'error' if ids.length > 1000
-      hashes = Family.hashify(legacy_ids: ids, attributes: params[:hash][:attrs].split(','), debug: params[:hash][:debug])
-      render xml: hashes.to_a
-    else
-      render text: t('not_authorized'), layout: true, status: 401
-    end
-  end
-
   def batch
     # delete family (used by Administration::DeletedPeopleController)
     if @logged_in.admin?(:edit_profiles) and params[:delete]
@@ -125,13 +107,6 @@ class FamiliesController < ApplicationController
         Family.find(id).destroy
       end
       redirect_back
-    # API for use by UpdateAgent
-    elsif @logged_in.admin?(:import_data) and Site.current.import_export_enabled?
-      xml_params = Hash.from_xml(request.body.read)['hash']
-      statuses = Family.update_batch(xml_params['records'], xml_params['options'] || {})
-      respond_to do |format|
-        format.xml { render xml: statuses }
-      end
     else
       render text: t('not_authorized'), layout: true, status: 401
     end
@@ -145,20 +120,9 @@ class FamiliesController < ApplicationController
     end
   end
 
-  def schema
-    render xml: Family.columns.map { |c| {name: c.name, type: c.type} }
-  end
-
   private
 
   def family_params
     params.require(:family).permit(:legacy_id, :barcode_id, :alternate_barcode_id, :name, :last_name, :address1, :address2, :city, :state, :zip, :home_phone, :email, :share_address, :share_mobile_phone, :share_work_phone, :share_fax, :share_email, :share_birthday, :share_anniversary, :visible, :share_activity, :share_home_phone, :photo)
-  end
-
-  def can_edit?
-    unless @logged_in.admin?(:edit_profiles)
-      render text: t('not_authorized'), layout: true, status: 401
-      return false
-    end
   end
 end

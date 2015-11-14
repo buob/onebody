@@ -27,25 +27,22 @@
           event_queue.push(e);
         }
       }, false);
-  %body.skin-blue{ date: { 'datepicker-format' => datepicker_format } }
+  %body{ class: setting(:appearance, :theme), data: { 'datepicker-format' => datepicker_format } }
     / header logo: style can be found in header.less
-    %header.header
+    %header.main-header
       = link_to setting(:name, :site), root_path, class: 'logo'
       / Header Navbar: style can be found in header.less
       %nav.navbar.navbar-static-top{ role: "navigation" }
         / Sidebar toggle button
-        %a.navbar-btn.sidebar-toggle{ 'data-toggle' => 'offcanvas', href: '#', role: 'button' }
+        %a.sidebar-toggle{ 'data-toggle' => 'offcanvas', href: '#', role: 'button' }
           %span.sr-only Toggle navigation
-          %span.icon-bar
-          %span.icon-bar
-          %span.icon-bar
-        .navbar-right
+        .navbar-custom-menu
           = render 'layouts/navbar_right'
         %h3.site-name
           = link_to setting(:name, :community), root_path
     .wrapper.row-offcanvas.row-offcanvas-left
       / Left side column. contains the logo and sidebar
-      %aside.left-side.sidebar-offcanvas
+      %aside.main-sidebar
         / sidebar: style can be found in sidebar.less
         %section.sidebar
           / Sidebar user panel
@@ -91,10 +88,11 @@
                     = link_to edit_person_account_path(@person) do
                       = icon 'fa fa-key'
                       = t('nav.profile_sub.password')
-                  %li
-                    = link_to edit_person_path(@person, email: true) do
-                      = icon 'fa fa-envelope'
-                      = t('nav.profile_sub.email')
+                  - if setting(:features, :groups)
+                    %li
+                      = link_to edit_person_path(@person, email: true) do
+                        = icon 'fa fa-envelope'
+                        = t('nav.profile_sub.email')
                   %li
                     = link_to edit_person_privacy_path(@person) do
                       = icon 'fa fa-lock'
@@ -129,10 +127,11 @@
                 %i.fa.pull-right{ class: tab_expanded?(:directory) ? 'fa-angle-down' : 'fa-angle-left' }
               - if tab_expanded?(:directory)
                 %ul.treeview-menu.visible
-                  %li
-                    = link_to search_path(business: true) do
-                      = icon 'fa fa-briefcase'
-                      = t('nav.directory_sub.business')
+                  - if setting(:features, :business_directory)
+                    %li
+                      = link_to search_path(business: true) do
+                        = icon 'fa fa-briefcase'
+                        = t('nav.directory_sub.business')
                   %li
                     = link_to new_printable_directory_path do
                       = icon 'fa fa-print'
@@ -143,14 +142,20 @@
                       = t('nav.directory_sub.advanced')
                   - if @logged_in.can_create?(Family)
                     %li
-                      = link_to new_family_path do
+                      = link_to new_person_path do
                         = icon 'fa fa-plus'
-                        = t('nav.directory_sub.new_family')
+                        = t('nav.directory_sub.new_person')
             - if setting(:features, :documents)
               %li{ class: tab_selected?(:documents) ? 'active' : '' }
                 = link_to documents_path do
                   %i.fa.fa-file
                   %span= t('nav.documents')
+            - if @logged_in.incomplete_tasks_count > 0
+              %li{ class: tab_selected?(:tasks) ? 'active' : '' }
+                = link_to tasks_path do
+                  %i.fa.fa-check-square
+                  %span= t('nav.tasks')
+                  = assigned_tasks_badge
             - if @logged_in.admin?
               %li{ class: tab_selected?(:admin) ? 'active' : '' }
                 = link_to admin_path do
@@ -166,14 +171,17 @@
           %section.content-header
             = breadcrumbs
             %h1
-              = @title
+              = @title || raw('&nbsp;')
               - if sub_title = yield(:sub_title).presence
                 %small= sub_title
         %section.content
           = flash_messages
           = yield
-    .footer
+    %aside.control-sidebar.control-sidebar-light
+      = render partial: 'layouts/sidebar_right'
+    %div.control-sidebar-bg
+    %footer.main-footer
       = render partial: 'layouts/footer_links'
     = javascript_include_tag 'application'
     = yield(:js)
-    = setting(:services, :analytics).to_s.html_safe if Rails.env.production?
+    = analytics_js

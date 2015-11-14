@@ -13,10 +13,10 @@ Contact:
     format: string
     value: admin@example.com
     global: true
-  Birthday Verification Email:
+  Send Email Changes To:
     format: string
     value: admin@example.com
-  Send Email Changes To:
+  Send Attendance Submissions To:
     format: string
     value: admin@example.com
   Community Address:
@@ -92,10 +92,49 @@ Features:
   Documents:
     format: boolean
     value: false
+  Business Directory:
+    format: boolean
+    value: false
+  Small Group Size:
+    format: string
+    value: 75
 Services:
   Analytics:
     format: string
     value:
+Pusher:
+  App ID:
+    format: string
+    value:
+  App Key:
+    format: string
+    value:
+  Secret:
+    format: string
+    value:
+  API Scheme:
+    format: string
+    value: http
+  API Host:
+    format: string
+    value: api.pusherapp.com
+  API Port:
+    format: string
+    value: 80
+  WS Host:
+    format: string
+    value: ws.pusherapp.com
+  WS Port:
+    format: string
+    value: 80
+  WSS Port:
+    format: string
+    value: 443
+Facebook:
+  App ID:
+    format: string
+  App Secret:
+    format: string
 URL:
   Visitor:
     format: string
@@ -111,6 +150,9 @@ System:
   Language:
     format: string
     value: en
+  Default Country:
+    format: string
+    value: US
   Suffixes:
     format: list
     value: |
@@ -125,6 +167,9 @@ System:
     format: list
     hidden: true
     value:
+  Map Zoom Level:
+    format: string
+    value: 13
   Adult Age:
     format: string
     value: 18
@@ -160,6 +205,9 @@ Appearance:
   Theme Nav Color:
     format: string
     value: E4E4E4
+  Theme:
+    format: string
+    value: skin-blue-light
 Privacy:
   Allow Unencrypted Logins:
     format: boolean

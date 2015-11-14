@@ -1,0 +1,35 @@
+.small-box {
+  margin-bottom: 20px;
+  overflow: hidden;
+  & > a {
+    color: #f9f9f9;
+    display: block;
+  }
+  .inner {
+    height: 7.8em;
+    padding: 10px;
+    position: relative;
+    z-index: 10;
+  }
+  .icon-disabled {
+    // no animation please
+    position: absolute;
+    top: auto;
+    bottom: 5px;
+    right: 5px;
+    z-index: 0;
+    font-size: 90px;
+    color: rgba(0, 0, 0, 0.15);
+  }
+}
+
+.box .box-header a:not(.btn) {
+  color: #3C8DBC;
+}
+
+.box-header .box-icon {
+  @extend .pull-right;
+  font-size: 20px;
+  line-height: 1.1;
+  padding: 10px;
+}

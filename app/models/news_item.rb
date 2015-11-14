@@ -3,9 +3,9 @@ class NewsItem < ActiveRecord::Base
   include Authority::Abilities
   self.authorizer_name = 'NewsItemAuthorizer'
 
-  has_many :comments, dependent: :destroy
   belongs_to :person
   belongs_to :site
+  has_many :comments, as: :commentable, dependent: :destroy
 
   validates :title, :body, presence: true
 
@@ -28,7 +28,7 @@ class NewsItem < ActiveRecord::Base
       title:           title,
       body:            body,
       person_id:       person_id,
-      context:         link.to_s.any? ? {'original_url' => link} : {},
+      context:         link.present? ? {'original_url' => link} : {},
       streamable_type: 'NewsItem',
       streamable_id:   id,
       created_at:      published,

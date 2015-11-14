@@ -9,13 +9,14 @@ pt:
     business_profile: Negócios
     checkin: Check-in
     checkin_sub:
-      times: Times
+      times: Horários
+      labels: Rótulos
     directory: Diretório
     directory_sub:
       business: "Diretório de Negócios"
       printed: "Diretório para Impressão"
       advanced: "Busa Avançada"
-      new_family: "New Family"
+      new_person: "Nova Pessoa"
     documents: Documentos
     groups: Grupos
     groups_sub:
@@ -29,6 +30,7 @@ pt:
       new_count:
         one: "1 novo"
         other: "%{count} novos"
+    imports: Importações
     messages: Mensagens
     news: Notícias
     notes: Notas
@@ -41,6 +43,11 @@ pt:
       password: Senha
       privacy: Privacidade
       relationships: Relacionamentos
-      show: "View Profile"
-    syncs: Sincronizações
+      show: "Visualizar Perfil"
+    report: Relatórios
     verses: Versículos
+    tasks: Tarefas
+    tasks_sub:
+      assigned_count:
+        one: "1 pessoa atribuída"
+        other: "%{count} pessoas atribuídas"

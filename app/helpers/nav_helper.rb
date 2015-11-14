@@ -67,8 +67,8 @@ module NavHelper
     when 'streams'
       :home
     when *%w(people accounts privacies relationships)
-      :profile if @person.try(:persisted?) and (me? or @logged_in.can_edit?(@person))
-    when 'groups'
+      :profile if @person.try(:persisted?) and (me? or @logged_in.can_update?(@person))
+    when *%w(groups tasks)
       :groups
     when *%w(searches printable_directories)
       :directory
@@ -83,7 +83,7 @@ module NavHelper
 
   def tab_expanded
     if tab_selected?(:groups)
-      :groups if @group and @logged_in.can_edit?(@group)
+      :groups if @group and @logged_in.can_update?(@group)
     else
       tab_selected
     end
@@ -109,4 +109,11 @@ module NavHelper
     end
   end
 
+  def assigned_tasks_badge
+    if (count = @logged_in.incomplete_tasks_count) > 0
+      content_tag(:small, class: 'badge bg-green') do
+        t('nav.tasks_sub.assigned_count', count: count)
+      end
+    end
+  end
 end

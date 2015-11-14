@@ -49,8 +49,8 @@ module Concerns
 
         alpha = nil
 
-        families = Family.has_printable_people.includes(:people) \
-          .order('families.last_name, families.name, people.sequence').references(:people)
+        families = Family.undeleted.has_printable_people.includes(:people) \
+          .order('families.last_name, families.name, people.position').references(:people)
         families.each do |family|
           if family.mapable? or family.home_phone.to_i > 0
             pdf.move_pointer 120 if pdf.y < 120
@@ -78,10 +78,10 @@ module Concerns
               end
               pdf.text family.name + "\n", font_size: 18
               pdf.move_pointer 10
-              image_file = File.read(family.photo.path(:large), encoding: 'binary', mode: 'rb')
               image = MiniMagick::Image.new(family.photo.path(:large))
               width = (150.0 / image[:height] * image[:width]).to_i
-              pdf.add_image image_file, pdf.absolute_left_margin, pdf.y-150, width, 150
+              image.format('jpg') if image.type == 'PNG'
+              pdf.add_image image.to_blob, pdf.absolute_left_margin, pdf.y-150, width, 150
               pdf.move_pointer 160
             else
               pdf.text family.name + "\n", font_size: 18
@@ -92,7 +92,7 @@ module Concerns
               pdf.text family.city + ', ' + family.state + '  ' + family.zip.to_s + "\n"
             end
             pdf.text ApplicationHelper.format_phone(family.home_phone), font_size: 14 if family.home_phone.to_i > 0
-            family.people.where(deleted: false).each do |person|
+            family.people.undeleted.each do |person|
               name = person.last_name == family.last_name ? person.first_name : person.name
               pdf.text "\n", font_size: 11
               pdf.add_text_wrap pdf.absolute_left_margin, pdf.y, 400, name, 11
@@ -119,7 +119,7 @@ module Concerns
       def generate_and_email_directory_pdf(with_pictures=false)
         filename = "#{Rails.root}/tmp/directory_for_user#{id}.pdf"
         generate_directory_pdf_to_file(filename, with_pictures)
-        Notifier.printed_directory(self, File.open(filename)).deliver
+        Notifier.printed_directory(self, File.open(filename)).deliver_now
       end
     end
   end

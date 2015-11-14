@@ -1,6 +1,6 @@
-require_relative '../spec_helper'
+require_relative '../rails_helper'
 
-describe 'SignIn' do
+describe 'SignIn', type: :request do
   before do
     @user = FactoryGirl.create(:person)
     Setting.set(nil, 'Features', 'SSL', true)
@@ -61,8 +61,7 @@ describe 'SignIn' do
       @group = FactoryGirl.create(:group)
       @membership = @group.memberships.create!(person: @user)
       get "/groups/#{@group.id}/memberships/#{@user.id}?code=#{@user.feed_code}&email=off", {}, referer: "/groups/#{@group.id}"
-      expect(response).to redirect_to(@group)
-      expect(@membership.reload.get_email).to eq(false)
+      expect(response).to render_template(:email)
     end
 
     it 'should not allow user to access most other actions' do

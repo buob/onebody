@@ -26,13 +26,20 @@ pt:
         button: "Diga \"olá\" para %{person}!"
       site:
         description: "O site da comunidade %{site} foi criado!"
+      stream_item_group:
+        person:
+          description:
+            one: "1 pessoa foi adicionada..."
+            other: "%{count} pessoas foram adicionadas..."
     footer:
       button_label:
+        default: "Leia mais"
         album: "Mostrar tudo"
         note: "Ler mais"
         verse: "Ler mais"
         person: ""
         site: ""
+        stream_item_group: "Mostrar tudo"
     load_more: "carregar mais..."
     share:
       heading:

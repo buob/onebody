@@ -35,21 +35,31 @@ module GroupsHelper
     not group.admin?(@logged_in) and @group.approval_required_to_join?
   end
 
-  NEW_GROUP_AGE = 5.days
-
   def new_groups
-    if @logged_in.admin?(:manage_groups)
-      Group.recent(NEW_GROUP_AGE)
-    else
-      Group.is_public.recent(NEW_GROUP_AGE)
-    end
+    groups = Group.where('id > ?', @logged_in.last_seen_group_id.to_i)
+    groups = groups.is_public unless @logged_in.admin?(:manage_groups)
+    groups
   end
 
   def group_content_column(&block)
-    count = [@group.email?, @group.prayer?, @group.pictures?].count { |t| t }
+    count = [@group.email?, @group.prayer?, @group.pictures?, @group.has_tasks?].count { |t| t }
     return if count == 0
     width = [12 / count, 6].min
-    content_tag(:div, class: "col-md-#{width} print-inline-block", &block)
+    if width <= 3
+      cls = "col-md-6"
+    else
+      cls = "col-md-#{width}"
+    end
+    content_tag(:div, class: "#{cls} print-inline-block", &block)
   end
 
+  def group_membership_modes
+    t('groups.edit.advanced.membership_mode.options').dup.tap { |options|
+      options.delete(:adults) if Person.undeleted.adults.count > Group::EVERYONE_LIMIT
+    }.invert
+  end
+
+  def can_see_group_documents?(group)
+    @logged_in.member_of?(group) || @logged_in.admin?(:manage_documents)
+  end
 end

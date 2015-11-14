@@ -1,4 +1,4 @@
-- @title = @family.name
+- @title = t('families.show.heading', family: @family.name)
 - map_header(@family)
 
 - if show_family_name_suggestion
@@ -6,14 +6,14 @@
     = icon 'fa fa-info-circle'
     = t('families.show.suggested_name_html', count: @family.people.undeleted.adults.count, first: @family.people.undeleted.adults.first.try(:name), second: @family.people.undeleted.adults.second.try(:name), url: edit_family_path(@family), name: @family.suggested_name)
 
-- if @family.updates.pending.any? and @logged_in.can_edit?(@family)
+- if @family.updates.pending.any? and @logged_in.can_update?(@family)
   .callout.callout-info
     = icon 'fa fa-clock-o'
     = t('families.updates.pending_callout')
 
 .row
   .col-md-6
-    = avatar_tag @family, size: :large
+    = avatar_tag @family, size: :large, class: 'fit-width'
 
     %table.table
       - if @family.show_attribute_to?(:home_phone, @logged_in)
@@ -34,29 +34,26 @@
 
   .col-md-6
     %table.table.family
-      - @people.each_with_index do |person, person_index|
-        %tr.row-with-avatar
-          %td.avatar= link_to avatar_tag(person), person
-          %td
-            = link_to person.name, person
-            - unless person.visible?
-              %i.fa.fa-lock
-          %td.actions
+      %tbody.sortable
+        - @people.each_with_index do |person, person_index|
+          %tr.row-with-avatar{ data: {update_position_path: update_position_family_person_path(@family, person)} }
             - if @logged_in.can_reorder?(@family)
-              - unless person_index == 0
-                = link_to reorder_family_path(@family, person_id: person, direction: 'up'), data: { method: 'put' }, class: 'btn bg-gray btn-xs text-blue' do
-                  = icon 'fa fa-arrow-circle-up'
-              - unless person_index == @people.length - 1
-                = link_to reorder_family_path(@family, person_id: person, direction: 'down'), data: { method: 'put' }, class: 'btn bg-gray btn-xs text-blue' do
-                  = icon 'fa fa-arrow-circle-down'
-            - if @logged_in.can_edit?(person)
-              = link_to edit_person_path(person), class: 'btn bg-gray btn-xs text-yellow' do
-                = icon 'fa fa-pencil'
-            - if @logged_in.can_delete?(person)
-              = link_to person, data: { method: 'delete', confirm: t('are_you_sure') },  class: 'btn bg-gray btn-xs text-red' do
-                = icon 'fa fa-minus-circle'
+              %td.handle
+                = icon 'fa fa-reorder', style: 'color: #999'
+            %td.avatar= link_to avatar_tag(person), person
+            %td
+              = link_to person.name, person
+              - unless person.visible?
+                %i.fa.fa-lock
+            %td.actions
+              - if @logged_in.can_update?(person)
+                = link_to edit_person_path(person), class: 'btn bg-gray btn-xs text-yellow' do
+                  = icon 'fa fa-pencil'
+              - if @logged_in.can_delete?(person)
+                = link_to person, data: { method: 'delete', confirm: t('are_you_sure') },  class: 'btn bg-gray btn-xs text-red' do
+                  = icon 'fa fa-minus-circle'
 
-    - if @logged_in.can_edit?(@family)
+    - if @logged_in.can_update?(@family)
       .page-controls
         = link_to edit_family_path(@family), class: 'btn btn-info' do
           = icon 'fa fa-pencil'

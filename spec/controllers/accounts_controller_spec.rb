@@ -1,6 +1,6 @@
-require_relative '../spec_helper'
+require_relative '../rails_helper'
 
-describe AccountsController do
+describe AccountsController, type: :controller do
   render_views
 
   before do
@@ -148,18 +148,13 @@ describe AccountsController do
                 expect(@person.family.name).to eq(@person.name)
               end
 
-              it 'should set can_sign_in=true' do
-                expect(@person).to be_can_sign_in
-              end
-
-              it 'should set full_access=true' do
-                expect(@person).to be_full_access
+              it 'should set status=active' do
+                expect(@person.status).to eq('active')
               end
             end
 
             context 'user is a child' do
               before do
-                ActionMailer::Base.deliveries.clear
                 @count_was = Person.count
                 post :create, {signup: {email: 'rick@example.com', first_name: 'Rick', last_name: 'Smith', birthday: Date.today.to_s}}
               end
@@ -203,12 +198,8 @@ describe AccountsController do
               expect(@person.family.name).to eq(@person.name)
             end
 
-            it 'should set can_sign_in=false' do
-              refute @person.can_sign_in?
-            end
-
-            it 'should set full_access=false' do
-              refute @person.full_access?
+            it 'should set status=inactive' do
+              expect(@person.status).to eq('inactive')
             end
           end
         end
@@ -274,10 +265,10 @@ describe AccountsController do
           end
         end
 
-        context 'user cannot sign in' do
+        context 'user is inactive' do
           before do
-            @person.update_attribute(:can_sign_in, false)
-            post :create, verification: {email: 'rick@example.com'}
+            @person.update_attributes(status: :inactive)
+            post :create, verification: { email: 'rick@example.com' }
           end
 
           it 'should show error message' do
@@ -301,7 +292,6 @@ describe AccountsController do
 
       context 'mobile phone for existing user' do
         before do
-          ActionMailer::Base.deliveries.clear
           @person = FactoryGirl.create(:person, mobile_phone: '1234567899')
         end
 
@@ -311,7 +301,7 @@ describe AccountsController do
           end
 
           it 'should send email verification email' do
-            expect(ActionMailer::Base.deliveries.last.subject).to eq("Verify Mobile")
+            expect(ActionMailer::Base.deliveries.last.subject).to eq('Verify Mobile Phone')
           end
 
           it 'should indicate that message was sent' do
@@ -319,10 +309,10 @@ describe AccountsController do
           end
         end
 
-        context 'user cannot sign in' do
+        context 'user is inactive' do
           before do
-            @person.update_attribute(:can_sign_in, false)
-            post :create, verification: {mobile_phone: '1234567899', carrier: 'AT&T'}
+            @person.update_attributes(status: :inactive)
+            post :create, verification: { mobile_phone: '1234567899', carrier: 'AT&T' }
           end
 
           it 'should show error message' do
@@ -520,13 +510,44 @@ describe AccountsController do
   end
 
   context '#verify_code' do
+    context 'GET without a code' do
+      before do
+        @verification = Verification.create!(email: @person.email)
+        get :verify_code, { id: @verification.id }
+      end
+
+      it 'renders the verify_code template' do
+        expect(response).to render_template(:verify_code)
+      end
+
+      it 'does not auto-submit the form' do
+        expect(response.body).to_not match(/submit\(\)/)
+      end
+    end
+
+    context 'GET with a code' do
+      before do
+        @verification = Verification.create!(email: @person.email)
+        get :verify_code, { id: @verification.id, code: '1234' }
+      end
+
+      it 'renders the verify_code template' do
+        expect(response).to render_template(:verify_code)
+      end
+
+      it 'auto-submits the form' do
+        expect(response.body).to match(/submit\(\)/)
+      end
+    end
+
     context 'given a non-pending email verification' do
       before do
         @verification = Verification.create!(email: @person.email, verified: false)
+        post :verify_code, { id: @verification.id }
       end
 
-      it 'should raise RecordNotFound exception' do
-        expect { get :verify_code, { id: @verification.id } }.to raise_error(ActiveRecord::RecordNotFound)
+      it 'should show a not valid message' do
+        expect(response.body).to match(/no longer valid/)
       end
     end
 
@@ -535,9 +556,9 @@ describe AccountsController do
         @verification = Verification.create!(email: @person.email)
       end
 
-      context 'GET with proper id and code' do
+      context 'POST with proper id and code' do
         before do
-          get :verify_code, {id: @verification.id, code: @verification.code}
+          post :verify_code, {id: @verification.id, code: @verification.code}
         end
 
         it 'should mark the verification verified' do
@@ -557,15 +578,15 @@ describe AccountsController do
         end
       end
 
-      context 'GET with improper id' do
+      context 'POST with improper id' do
         it 'should raise RecordNotFound exception' do
-          expect { get :verify_code, {id: '111111111'} }.to raise_error(ActiveRecord::RecordNotFound)
+          expect { post :verify_code, {id: '111111111'} }.to raise_error(ActiveRecord::RecordNotFound)
         end
       end
 
-      context 'GET with proper id and wrong code' do
+      context 'POST with proper id and wrong code' do
         before do
-          get :verify_code, {id: @verification.id, code: '1'}
+          post :verify_code, {id: @verification.id, code: '1'}
         end
 
         it 'should not mark the verification verified' do
@@ -586,9 +607,9 @@ describe AccountsController do
           @spouse = FactoryGirl.create(:person, family: @person.family, email: @person.email)
         end
 
-        context 'GET with proper id and code' do
+        context 'POST with proper id and code' do
           before do
-            get :verify_code, {id: @verification.id, code: @verification.code}
+            post :verify_code, {id: @verification.id, code: @verification.code}
           end
 
           it 'should mark the verification verified' do
@@ -596,7 +617,7 @@ describe AccountsController do
           end
 
           it 'should set select people in session' do
-            expect(session[:select_from_people]).to eq([@person, @spouse])
+            expect(session[:select_from_people]).to contain_exactly(@person, @spouse )
           end
 
           it 'should redirect to select account path' do
@@ -612,9 +633,9 @@ describe AccountsController do
         @verification = Verification.create!(mobile_phone: @person.mobile_phone, carrier: 'AT&T')
       end
 
-      context 'GET with proper id and code' do
+      context 'POST with proper id and code' do
         before do
-          get :verify_code, {id: @verification.id, code: @verification.code}
+          post :verify_code, {id: @verification.id, code: @verification.code}
         end
 
         it 'should mark the verification verified' do

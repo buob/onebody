@@ -1,5 +1,4 @@
 .bundle
-db/schema.rb
 db/*.sql
 db/*.backup.*
 tmp
@@ -27,3 +26,6 @@ script/package
 .idea
 .vagrant
 Vagrantfile.local
+.gem
+coverage
+cache.tar.gz

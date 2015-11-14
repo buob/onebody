@@ -1,29 +1,95 @@
 ---
 pt:
   notifier:
-    attached_your_custom_directory: "Hello, %{name}. Attached is your custom printed directory from %{site}."
-    be_sure_to_send_verification_email: "Be sure to also click to \"send verification email\" to the user."
-    check_boxes_in_visibility_sidebar: "Check all the appropriate boxes in the \"Visibility\" tab and save."
-    click_link_to_complete_process: "Click the following link to complete the process: %{url}"
-    has_submited_profile_update: "submeteu uma atualização de perfil"
-    if_you_cannot_click_link: "If you cannot click the link above, you may need to copy and paste it into the address bar of your web browser."
-    if_you_approve_this_account_creation: "If you approve of this account creation, activate the account at this address"
-    if_you_dont_know_why_get_this_email: "If you don't know why you're getting this email, you may contact %{name} at %{phone}."
+    email_update:
+      subject: "%{person} Alterou o Email"
+      intro: "%{person} alterou o seu endereço de email."
+      email_label: Email
+    email_verification:
+      subject: "Verificar Email"
+      intro: "O objetivo deste email é verificar o seu endereço para o \n\
+          %{site} para que você possa acessá-lo. \n"
+      instruction: "Para verificar o seu endereço de email, por favor clique no link abaixo: \n"
+      footer: "Se você não conseguir clicar no link acima, você pode copiar e colar \n\
+          na barra de endereço do seu navegador.\n\n\
+          Se você não sabe porque está recebendo esse e-mail, você pode contactar \n\
+          %{name} no telefone %{phone}. \n"
+    friend_request:
+      subject: "Pedido de amizade de %{person}"
+      intro: "%{person} gostaria de ser seu amigo(a) na %{site}. \n"
+      instruction: "Para aceitar ou rejeitar, por favor entre no site com a seguinte URL: \n"
+    membership_request:
+      subject: "Solicitação para entrar no Grupo de %{person}"
+      intro: "%{person} solicitou acesso ao grupo %{group}. \n"
+      instruction: "Para aceitar ou rejeitar, por favor entre no site com a seguinte URL: \n"
+    mobile_verification:
+      subject: "Verificar Telefone Celular"
+      label: "Código de verificação:"
+    pending_sign_up:
+      subject: "Acesso Pendente"
+      intro: "%{person} se cadastrou para uma conta no site %{site}. \n"
+      instruction_first: "Se você aprova a criação desta conta, ative-a \n\
+          neste endereço: \n"
+      instruction_last: "Marque as caixas apropriadas na aba \"Visibilidade\" e salve.\n\n\
+          Tenha certeza de também clicar na opção \"enviar email de verificação\" para o usuário. \n"
+    photo_update:
+      family_subject: "Foto da Família Alterada"
+      person_subject: "Foto Alterada"
+      intro: "%{person} alterou a sua foto. \n"
+    prayer_request:
+      subject: "Pedido de Oração no grupo %{group}"
+      intro: "%{person} postou um novo pedido de oração no grupo %{group}. \n"
+    printed_directory:
+      subject: "Diretório do %{site}"
+      intro: "Olá, %{person}. Em anexo você pode verificar o seu diretório customizado para impressão da %{site}. \n"
+    profile_update:
+      subject: "Atualização de Perfil da pessoa %{person}"
+      intro: "%{person} (Família %{family}) submeteu uma atualização de perfil. \n"
+      label:
+        new: Novo
+        old: "de idade"
+    rejection:
+      cannot_read:
+        subject: "Mensagem não foi Enviada: %{subject}"
+        body: "A sua mensagem com o assunto \"%{subject}\" não foi entregue.\n\n\
+            Nós pedimos desculpas pelo inconveniente. O sistema não conseguiu ler a sua mensagem \n\
+            porque ela não está formatada como texto sem formatação ou HTML.\n\n\
+            Por favor configure o seu cliente de email para texto sem formatação (desligue a opção Rich Text) e tente \n\
+            novamente. Você também pode enviar a sua mensagem pelo website depois de acessá-lo \n\
+            \x20na URL abaixo:  \n\n\
+            %{url} \n"
+      multiple_people:
+        subject: "Mensagem não foi Enviada: %{subject}"
+        body: "A sua mensagem com o assunto \"%{subject}\" não foi entregue.\n\n\
+            Nós pedimos desculpas pelo inconveniente. O sistema não conseguiu determinar quem é você\n\
+            porque mais de uma pessoa na sua família compartilha o mesmo endereço de email.\n\
+            Por favor entre no site usando a URL abaixo e envie a sua mensagem pelo site.\n\n\
+            %{url}\n\n\
+            Como uma alternativa, você pode acessar o site na URL acima, ir para as suas configurações de email\n\
+            e marcar a opção chamada \"Dono da conta de email principal\". \n"
+      unknown_person:
+        subject: "Mensagem não foi Enviada: %{subject}"
+        body: "A sua mensagem com o assunto \"%{subject}\" não foi entregue.\n\n\
+            Nós pedimos desculpas pelo inconveniente. O sistema não conseguiu reconhecer o seu\n\
+            endereço de email como um usuário deste website.\n\n\
+            Por favor envie o email utilizando o mesmo endereço que você utiliza para acessar ma seguinte\n\
+            URL, ou acesse e envie a sua mensagem pelo website.\n\n\
+            %{url} \n"
+      invalid:
+        subject: "Erro na Mensagem: %{subject}"
+        body: "A sua mensagem com o assunto \"%{subject}\" não foi entregue.\n\n\
+            Nós pedimos desculpas pelo inconveniente. O sistema não conseguiu salvar a sua mensagem\n\
+            pelo(s) seguinte(s) motivo(s):\n\n\
+            %{errors}\n\n\
+            Por favor, encaminhe esta mensagem para o suporte no endereço: %{support} \n"
+      no_recipients:
+        subject: "A mensagem não foi enviada: %{subject}"
+        body: "A sua mensagem com o assunto \"%{subject}\" não foi entregue para nenhum grupo.\n\n\
+            Nós pedimos desculpas pelo inconveniente. O sistema não conseguiu encontrar nenhum endereço de grupo válido\n\
+            nos campos PARA ou CC.\n\n\
+            Verifique se você digitou o endereço de email do grupo corretamente e que você possui\n\
+            permissão para enviar emails para este grupo.\n\n\
+            Você pode também acessar a seguinte URL para enviar a sua mensagem:\n\n\
+            %{url} \n"
     message_id: "ID da Mensagem"
-    name_has_requested_join_group: "%{name} solicitou para entrar no grupo %{group}."
-    name_submitted_birthday_request: "%{name} has submitted a birthday verification request"
-    new: Nova
-    old: Old
-    person_had_their_email_changed: "%{name} teve o seu email alterado."
-    person_has_changed_photo: "%{name} has changed their photo."
-    person_has_signed_for_account: "%{name} has signed up for an account."
-    person_wants_to_be_your_friend: "%{name} gostaria de ser seu amigo no %{site}."
-    please_make_updates: "Por favor execute as atualizações apropriadas no banco de dados de membros."
-    this_email_to_verify_email: "This email is to verify your email address for access to the %{site} website. To verify your email address, please click the link below"
-    this_notify_someone_reported: "This is to notify you that someone has reported that the date and time are incorrect at %{site}."
-    to_accept_or_decline: "Para aceitar ou recusar, por favor acesse aqui"
-    to_approve_or_ignore: "To approve or ignore, sign in and visit the following address"
-    update_record_membership: "Update their record in the membership database."
-    verification_code: "Código de Verificação"
-    verify_person_identity: "Verify this person's identity. Be cautious; if in doubt, use the phone number provided to validate this person is who they say they are."
-    wait_one_day_and_wait: "WAIT ONE DAY or manually trigger the database update script on the server and wait until it is finished."
+    not_allowed_to_post: "você não possui permissão para postar nesta lista"

@@ -3,18 +3,18 @@
 .row
 
   .col-md-8
-    - if @logged_in.can_edit?(@group) and @requests.any?
+    - if @logged_in.can_update?(@group) and @requests.any?
       = form_tag batch_group_memberships_path(@group) do |form|
         .box.box-warning
           .box-header
             %h3.box-title= t('memberships.requests.heading')
           .box-body
-            %table.table
+            %table.table.print-full-width
               %tr
-                %th{ style: 'width:75px' } Select
                 %th
-                %th Name
-                %th Requested
+                %th
+                %th= t('memberships.requests.name')
+                %th= t('memberships.requests.created_at')
               - @requests.each do |req|
                 %tr.row-with-avatar
                   %td
@@ -40,41 +40,42 @@
 
     - if @group.people.any?
       = form_tag batch_group_memberships_path(@group), method: :delete do
-        %table.members.table
+        %table.members.table.print-full-width
           %thead
             %tr
-              - if @logged_in.can_edit?(@group)
-                %th{ style: 'width:75px' } Select
+              - if @logged_in.can_update?(@group)
+                %th
               %th
-              %th Name
+              %th= t('.details.name')
               - if params[:birthdays]
-                %th Birthday
+                %th= t('.details.birthday')
               - else
-                %th Added
-              - if @logged_in.can_edit?(@group)
+                %th= t('.details.created_at')
+              - if @logged_in.can_update?(@group)
                 %th
           %tbody#memberships
             - @memberships.includes(:person).order('people.last_name', 'people.first_name').each do |membership|
               - if person = membership.person
                 = render partial: 'membership', object: membership
 
-        - if @logged_in.can_edit?(@group)
+        - if @logged_in.can_update?(@group)
           .page-controls
             = button_tag class: 'btn btn-delete' do
               = icon 'fa fa-minus-circle'
-              Remove Selected
+              = t('.remove.button')
 
     - else
       %p= t('none')
 
     = pagination @memberships
 
-  .col-md-4
-    .box.box-success
-      .box-header
-        %h3.box-title Add Someone
-      .box-body
-        - if @logged_in.can_edit?(@group)
+  .col-md-4.hidden-print
+    - if @logged_in.can_update?(@group)
+      .box.box-success
+        .box-header
+          %h3.box-title
+            = t('memberships.add.heading')
+        .box-body
           - if @group.approved?
             = form_tag search_path, remote: true do
               = hidden_field_tag :select_person, true
@@ -82,11 +83,12 @@
                 = label_tag :add_person_name do
                   = t('memberships.add.description')
                 = text_field_tag 'name', nil, id: 'add_person_name', class: 'form-control', placeholder: t('memberships.add.name_placeholder')
-                - if @group.parents_of
-                  %strong
-                    Remember, this is a group automatically containing
-                    parents of people in #{link_to @group.parents_of_group.name, @group.parents_of_group}.
-                    Adding people manually should be done sparingly.
+                - if @group.parents_of?
+                  .callout.callout-danger.push-down
+                    = t('memberships.add.parents_of_warning_html', group: link_to(@group.parents_of_group.try(:name), @group.parents_of_group))
+                - elsif @group.linked?
+                  .callout.callout-danger.push-down
+                    = t('memberships.add.linked_group_warning_html', code: @group.link_code)
               .form-group
                 = button_tag t('search.search_by_name'), class: 'btn btn-info'
             #add_member{ style: 'display:none' }

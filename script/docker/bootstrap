@@ -51,7 +51,7 @@ puts
 
 if migrate
   puts '=> creating database'
-  run "docker run --rm --link onebody-data:db onebody bundle exec rake db:create db:migrate"
+  run "docker run --rm --link onebody-data:db onebody bundle exec rake db:create db:migrate db:seed"
   puts '-> done'
   puts
 end
@@ -59,13 +59,6 @@ end
 unless containers.grep(/server/).any?
   puts '=> creating server container'
   run "docker run --name='server' -d --link onebody-data:db -v /var/data/onebody/files:/data -p 80:3000 onebody /server"
-  puts '-> done'
-  puts
-end
-
-unless containers.grep(/worker/).any?
-  puts '=> creating worker container'
-  run "docker run --name='worker' -d --link onebody-data:db -v /var/data/onebody/files:/data onebody /worker -c"
   puts '-> done'
   puts
 end

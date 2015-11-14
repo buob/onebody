@@ -6,7 +6,7 @@ module Concerns
       EXPORT_COLS = {
         person: %w(
           family_id
-          sequence
+          position
           gender
           first_name
           last_name
@@ -19,13 +19,6 @@ module Concerns
           classes
           shepherd
           mail_group
-          activities
-          interests
-          music
-          tv_shows
-          movies
-          books
-          quotes
           about
           testimony
           share_mobile_phone
@@ -57,10 +50,7 @@ module Concerns
           staff
           elder
           deacon
-          can_sign_in
-          visible_to_everyone
-          visible_on_printed_directory
-          full_access
+          status
           legacy_family_id
           share_activity
           child
@@ -101,10 +91,6 @@ module Concerns
           end
         end
 
-        def create_to_csv_job
-          Job.add("GeneratedFile.create!(:job_id => JOB_ID, :person_id => #{::Person.logged_in.id}, :file => FakeFile.new(::Person.to_csv, 'people.csv'))")
-        end
-
         def to_xml
           builder = Builder::XmlMarkup.new
           builder.families do |families|
@@ -116,7 +102,7 @@ module Concerns
                     fam.tag!(col, family.send(col))
                   end
                   fam.people do |people|
-                    family.people.sort_by(&:sequence).each do |person|
+                    family.people.sort_by(&:position).each do |person|
                       people.person do |p|
                         EXPORT_COLS[:person].each do |col|
                           p.tag!(col, person.attributes[col])
@@ -128,10 +114,6 @@ module Concerns
               end
             end
           end
-        end
-
-        def create_to_xml_job
-          Job.add("GeneratedFile.create!(:job_id => JOB_ID, :person_id => #{::Person.logged_in.id}, :file => FakeFile.new(::Person.to_xml, 'people.xml'))")
         end
       end
 

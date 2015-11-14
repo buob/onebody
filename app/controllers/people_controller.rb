@@ -1,16 +1,15 @@
 class PeopleController < ApplicationController
-
   def index
     respond_to do |format|
       format.html { redirect_to person_path(@logged_in) }
       if can_export?
         format.xml do
-          job = Person.create_to_xml_job
-          redirect_to generated_file_path(job.id)
+          job = ExportJob.perform_later(Site.current, 'people', 'xml', @logged_in.id)
+          redirect_to generated_file_path(job.job_id)
         end
         format.csv do
-          job = Person.create_to_csv_job
-          redirect_to generated_file_path(job.id)
+          job = ExportJob.perform_later(Site.current, 'people', 'csv', @logged_in.id)
+          redirect_to generated_file_path(job.job_id)
         end
       end
     end
@@ -24,9 +23,9 @@ class PeopleController < ApplicationController
     else
       @person = Person.where(id: params[:id]).includes(:family).first
     end
-    if params[:limited] or !@logged_in.full_access?
+    if params[:limited] || !@logged_in.active?
       render action: 'show_limited'
-    elsif @person and @logged_in.can_see?(@person)
+    elsif @person and @logged_in.can_read?(@person)
       @family = @person.family
       if @person == @logged_in
         # TODO eager load family here
@@ -57,9 +56,14 @@ class PeopleController < ApplicationController
 
   def new
     if @logged_in.admin?(:edit_profiles)
-      @family = Family.find(params[:family_id])
-      @person = @family.people.new
-      @person.set_default_visibility
+      if params[:family_id]
+        @family = Family.find(params[:family_id])
+        @person = @family.people.new
+      else
+        @family = Family.new
+        @person = Person.new(family: @family)
+      end
+      @person.status = :active
     else
       render text: t('not_authorized'), layout: true, status: 401
     end
@@ -67,17 +71,22 @@ class PeopleController < ApplicationController
 
   def create
     if @logged_in.admin?(:edit_profiles)
-      @business_categories = Person.business_categories
-      @custom_types = Person.custom_types
-      params[:person].cleanse(:birthday, :anniversary)
       @person = Person.new_with_default_sharing(person_params)
-      @family = Family.find(params[:person][:family_id])
+      if (family_id = params[:person][:family_id]).present?
+        @family = Family.find(family_id)
+      else
+        @family = Family.new(family_params.merge(
+          name: @person.name,
+          last_name: @person.last_name
+        ))
+      end
       @person.family = @family
       respond_to do |format|
-        if @person.save
+        if @family.save and @person.save
           format.html { redirect_to @person.family }
           format.xml  { render xml: @person, status: :created, location: @person }
         else
+          @person.valid? # trigger any error messages
           format.html { render action: "new" }
           format.xml  { render xml: @person.errors, status: :unprocessable_entity }
         end
@@ -89,7 +98,8 @@ class PeopleController < ApplicationController
 
   def edit
     @person ||= Person.find(params[:id])
-    if @logged_in.can_edit?(@person)
+    render(text: t('people.edit.no_family_error'), layout: true) && return unless @person.family
+    if @logged_in.can_update?(@person)
       @family = @person.family
       @business_categories = Person.business_categories
       @custom_types = Person.custom_types
@@ -110,7 +120,7 @@ class PeopleController < ApplicationController
       @family.people << @person
       flash[:info] = t('people.move.success_message', person: @person.name, family: @family.name)
       redirect_to @family
-    elsif @logged_in.can_edit?(@person)
+    elsif @logged_in.can_update?(@person)
       @updater = Updater.new(params)
       if @updater.save!
         respond_to do |format|
@@ -135,40 +145,12 @@ class PeopleController < ApplicationController
       @person = Person.find(params[:id])
       if me?
         render text: t('people.cant_delete_yourself'), layout: true, status: 401
-      elsif @person.global_super_admin?
+      elsif @person.super_admin?
         render text: t('people.cant_delete'), layout: true, status: 401
       else
         @person.destroy
         redirect_to @person.family
       end
-    else
-      render text: t('not_authorized'), layout: true, status: 401
-    end
-  end
-
-  def import
-    if @logged_in.admin?(:import_data) and Site.current.import_export_enabled?
-      if request.get?
-        @column_names = Person.importable_column_names
-      elsif request.post?
-        @records = Person.queue_import_from_csv_file(params[:file].read, params[:match_by_name], params[:attributes])
-        render action: 'import_queue'
-      elsif request.put?
-        @completed, @errored = Person.import_data(params)
-        render action: 'import_results'
-      end
-    else
-      render text: t('not_authorized'), layout: true, status: 401
-    end
-  end
-
-  def hashify
-    params.merge!(Hash.from_xml(request.body.read))
-    if @logged_in.admin?(:import_data) and Site.current.import_export_enabled?
-      ids = params[:hash][:legacy_id].to_s.split(',')
-      raise 'error' if ids.length > 1000
-      hashes = Person.hashify(legacy_ids: ids, attributes: params[:hash][:attrs].split(','), debug: params[:hash][:debug])
-      render xml: hashes.to_a
     else
       render text: t('not_authorized'), layout: true, status: 401
     end
@@ -182,25 +164,14 @@ class PeopleController < ApplicationController
         format.html { redirect_to family_path(params[:family_id]) }
         format.js   { render js: "location.replace('#{family_path(params[:family_id])}')" }
       end
-    # API for use by UpdateAgent
-    elsif @logged_in.admin?(:import_data) and Site.current.import_export_enabled?
-      xml_params = Hash.from_xml(request.body.read)['hash']
-      statuses = Person.update_batch(xml_params['records'], xml_params['options'] || {})
-      respond_to do |format|
-        format.xml { render xml: statuses }
-      end
     else
       render text: t('not_authorized'), layout: true, status: 401
     end
   end
 
-  def schema
-    render xml: Person.columns.map { |c| {name: c.name, type: c.type} }
-  end
-
   def testimony
     @person = Person.find(params[:id])
-    unless @logged_in.can_see?(@person)
+    unless @logged_in.can_read?(@person)
       render text: t('people.not_found'), status: 404, layout: true
     end
   end
@@ -212,11 +183,20 @@ class PeopleController < ApplicationController
     end
   end
 
+  def update_position
+    @family = Family.find(params[:family_id])
+    @person = @family.people.find(params[:id])
+    @person.insert_at(params[:position].to_i) if @family.reorderable_by?(@logged_in)
+    render nothing: true
+  end
+
   private
 
-  # FIXME this is temporary
   def person_params
     Updater.new(params).params[:person]
   end
 
+  def family_params
+    Updater.new(params).params[:family] || {}
+  end
 end

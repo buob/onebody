@@ -13,12 +13,7 @@ OneBody::Application.routes.draw do
 
   resources :people do
     collection do
-      get  :schema
-      get  :import
-      post :import
-      post :hashify
       post :batch
-      put  :import
     end
     member do
       get :favs
@@ -45,23 +40,22 @@ OneBody::Application.routes.draw do
     end
     resource :stream
     resource :photo
-    resources :groups, :pictures, :groupies, :services, :albums, :notes, :verses
-    resource :privacy, :blog, :calendar
+    resources :groups, :pictures, :services, :albums, :verses
+    resource :privacy
   end
 
   resources :families do
     collection do
-      get  :schema
-      post :hashify
       post :batch
       post :select
     end
-    member do
-      put :reorder
-    end
     resource :photo
     resources :relationships
-    resources :people
+    resources :people do
+      member do
+        post :update_position
+      end
+    end
     resource :search
   end
 
@@ -87,9 +81,15 @@ OneBody::Application.routes.draw do
         post :batch
       end
     end
+    resources :tasks do
+      member do
+        patch :complete
+        post :update_position
+      end
+    end
     resource :stream
     resource :photo
-    resources :notes, :prayer_requests, :albums, :attachments
+    resources :prayer_requests, :albums
     resource :calendar
   end
 
@@ -121,16 +121,21 @@ OneBody::Application.routes.draw do
     resources :attachments
   end
 
-  resources :emails
+  resource :emails
+
+  get 'setup_email' => 'emails#create_route'
+  put 'setup_email' => 'emails#create_route'
 
   resources :tags, only: :show
 
-  resources :pictures, :prayer_signups, :authentications, :verses, :shares,
+  resources :pictures, :prayer_signups, :authentications, :shares,
             :comments, :prayer_requests, :generated_files
 
-  resources :notes, except: :index
+  resources :verses do
+    get 'search', on: :collection
+  end
 
-  resource  :setup, :session, :search, :printable_directory, :privacy
+  resource :setup, :session, :search, :printable_directory
 
   resource :stream do
     resources :people, controller: 'stream_people'
@@ -153,9 +158,22 @@ OneBody::Application.routes.draw do
     get :download, on: :member
   end
 
+  resources :tasks do
+    member do
+      patch :complete
+    end
+  end
+
+  resources :directory_maps do
+    collection do
+      get :family_locations
+    end
+  end
+
   get 'pages/*path' => 'pages#show_for_public', via: :get, as: :page_for_public
 
   get '/admin' => 'administration/dashboards#show'
+  get '/admin/reports' => 'administration/reports#index'
 
   namespace :administration, path: :admin do
     resources :emails do
@@ -175,15 +193,13 @@ OneBody::Application.routes.draw do
         get :next
       end
     end
-    resources :syncs do
-      member do
-        post :create_items
-      end
-    end
     resources :deleted_people do
       collection do
         put :batch
       end
+    end
+    resources :imports do
+      patch :execute, on: :member
     end
     resources :updates, :admins, :membership_requests
     namespace :checkin do
@@ -196,13 +212,20 @@ OneBody::Application.routes.draw do
       resources :times do
         resources :groups
       end
-      resources :cards, :auths
+      resources :cards, :auths, :labels
     end
   end
 
+  resource :checkin, controller: 'checkin/checkins'
   namespace :checkin do
-    root to: 'interfaces#show'
-    resource :interface
+    resource :print
+    resource :printer
     resources :families, :people, :groups
   end
+  resources :custom_reports
+
+  post '/pusher/auth_printer'    => 'pusher#auth_printer'
+  get '/auth/facebook/callback'  => 'sessions#create_from_external_provider'
+  post '/auth/facebook/callback' => 'sessions#create_from_external_provider'
+  get '/auth/:provider/setup'    => 'sessions#setup_omniauth'
 end

@@ -1,6 +1,6 @@
-require_relative '../spec_helper'
+require_relative '../rails_helper'
 
-describe GroupsController do
+describe GroupsController, type: :request do
 
   before do
     @user = FactoryGirl.create(:person)
@@ -30,7 +30,7 @@ describe GroupsController do
     end
 
     it 'should show allow user to Approve group' do
-      get "groups/#{@group.id}"
+      get "/groups/#{@group.id}"
       assert_select 'body', html: /Approve Group/
       put "/groups/#{@group.id}?group[approved]=true"
       expect(response).to redirect_to(@group)
@@ -52,12 +52,13 @@ describe GroupsController do
 
     context 'with code' do
       it 'should disable email' do
-        get "/groups/#{@group.id}/memberships/#{@user.id}?code=#{@user.feed_code}&email=off", {}, referer: "/groups/#{@group.id}"
+        patch "/groups/#{@group.id}/memberships/#{@user.id}", code: @user.feed_code, email: 'off'
         expect(@group.get_options_for(@user).get_email).not_to be
       end
 
       it 'should enable email' do
-        get "/groups/#{@group.id}/memberships/#{@user.id}?code=#{@user.feed_code}&email=on", {}, referer: "/groups/#{@group.id}"
+        @group.set_options_for(@user, get_email: false)
+        patch "/groups/#{@group.id}/memberships/#{@user.id}", code: @user.feed_code, email: 'on'
         expect(@group.get_options_for(@user).get_email).to be
       end
     end

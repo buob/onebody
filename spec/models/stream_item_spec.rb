@@ -1,4 +1,4 @@
-require_relative '../spec_helper'
+require_relative '../rails_helper'
 
 describe StreamItem do
 
@@ -6,39 +6,6 @@ describe StreamItem do
     @person = FactoryGirl.create(:person, created_at: 1.hour.ago)
     @group = FactoryGirl.create(:group, created_at: 1.hour.ago)
     @group.memberships.create! person: @person
-  end
-
-  describe 'Note' do
-    it "should create a shared stream item when the note is on a group" do
-      @note = FactoryGirl.create(:note, group: @group, person: @person)
-      items = StreamItem.where(streamable_type: "Note", streamable_id: @note.id).to_a
-      expect(items.length).to eq(1)
-      expect(items.first).to be_shared
-    end
-
-    it "should create a shared stream item when the note is not on a group and the note's owner is sharing their activity" do
-      @note = FactoryGirl.create(:note, person: @person)
-      items = StreamItem.where(streamable_type: "Note", streamable_id: @note.id).to_a
-      expect(items.length).to eq(1)
-      expect(items.first).to be_shared
-    end
-
-    it "should create a non-shared stream item if the note is not on a group and the note's owner is not sharing their activity" do
-      @person.update_attributes! share_activity: false
-      @note = FactoryGirl.create(:note, person: @person)
-      items = StreamItem.where(streamable_type: "Note", streamable_id: @note.id).to_a
-      expect(items.length).to eq(1)
-      expect(items.first).to_not be_shared
-    end
-
-    it "should delete all associated stream items when the note is deleted" do
-      @note = FactoryGirl.create(:note, person: @person)
-      items = StreamItem.where(streamable_type: "Note", streamable_id: @note.id).to_a
-      expect(items.length).to eq(1)
-      @note.destroy
-      items = StreamItem.where(streamable_type: "Note", streamable_id: @note.id).to_a
-      expect(items.length).to eq(0)
-    end
   end
 
   describe 'NewsItem' do

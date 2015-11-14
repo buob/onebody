@@ -1,6 +1,6 @@
-require_relative '../spec_helper'
+require_relative '../rails_helper'
 
-describe ApplicationHelper do
+describe ApplicationHelper, type: :helper do
   before do
     @user = FactoryGirl.create(:person, birthday: Date.new(1981, 4, 28), mobile_phone: '9181234567')
   end
@@ -66,8 +66,6 @@ describe ApplicationHelper do
     attr_accessor :params
 
     it 'should generate a link to the correct url' do
-      @params = {controller: 'administration/syncs', action: 'show', id: 1}
-      expect(sortable_column_heading("type", "sync_items.syncable_type")).to match(/\/admin\/syncs\/1/)
       @params = {controller: 'administration/deleted_people', action: 'index'}
       expect(sortable_column_heading("id", "people.id")).to match(/\/admin\/deleted_people/)
       @params = {controller: 'administration/attendance', action: 'index'}
@@ -86,33 +84,6 @@ describe ApplicationHelper do
     it 'should preserve other args' do
       @params = {controller: 'administration/attendance', action: 'index', page: 1}
       expect(sortable_column_heading("group", "groups.name", [:page])).to match(/\/admin\/attendance\?page=1&amp;sort=groups\.name/)
-    end
-  end
-
-  context 'date_field and date_field_tag' do
-    it 'should output a text field' do
-      Setting.set(:formats, :date, '%m/%d/%Y')
-      OneBody.set_local_formats
-      expect(date_field_tag(:birthday, Date.new(1981, 4, 28))).to eq("<input id=\"birthday\" name=\"birthday\" type=\"date\" value=\"1981-04-28\" />")
-      form_for(@user) do |form|
-        expect(form.date_field(:birthday)).to eq("<input id=\"person_birthday\" name=\"person[birthday]\" type=\"date\" value=\"1981-04-28\" />")
-      end
-    end
-
-    it 'should handle nil and empty string' do
-      @user.birthday = nil
-      expect(date_field_tag(:birthday, "")).to eq("<input id=\"birthday\" name=\"birthday\" type=\"date\" value=\"\" />")
-      form_for(@user) do |form|
-        expect(form.date_field(:birthday)).to eq("<input id=\"person_birthday\" name=\"person[birthday]\" type=\"date\" />")
-      end
-    end
-  end
-
-  describe 'phone_field' do
-    it 'should output a text field' do
-      form_for(@user) do |form|
-        expect(form.phone_field(:mobile_phone)).to eq("<input id=\"person_mobile_phone\" name=\"person[mobile_phone]\" size=\"15\" type=\"text\" value=\"(918) 123-4567\" />")
-      end
     end
   end
 

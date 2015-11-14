@@ -1,4 +1,4 @@
-require_relative '../spec_helper'
+require_relative '../rails_helper'
 
 describe Group do
   before do
@@ -14,6 +14,7 @@ describe Group do
     context 'given user has a single class code' do
       before do
         @person = FactoryGirl.create(:person, classes: 'foo')
+        @group.membership_mode = 'link_code'
         @group.link_code = 'foo'
         @group.save
       end
@@ -26,6 +27,7 @@ describe Group do
     context 'given user has multiple class codes' do
       before do
         @person = FactoryGirl.create(:person, classes: 'foo,bar,baz')
+        @group.membership_mode = 'link_code'
         @group.link_code = 'bar'
         @group.save
       end
@@ -38,6 +40,7 @@ describe Group do
     context 'given user has multiple class codes with roles' do
       before do
         @person = FactoryGirl.create(:person, classes: 'foo[member],bar[participant|group leader],baz')
+        @group.membership_mode = 'link_code'
         @group.link_code = 'bar'
         @group.save
       end
@@ -72,6 +75,18 @@ describe Group do
         end
       end
     end
+
+    context 'group is set to auto_add "adults"' do
+      before do
+        @person2 = FactoryGirl.create(:person)
+        @child = FactoryGirl.create(:person, child: true)
+        @group.update_attribute(:membership_mode, 'adults')
+      end
+
+      it 'adds all people' do
+        expect(@group.people.reload).to include(@person, @person2)
+      end
+    end
   end
 
   context 'given one group set as parents_of for another' do
@@ -80,7 +95,7 @@ describe Group do
       @spouse = FactoryGirl.create(:person, family: @head.family)
       @child = FactoryGirl.create(:person, family: @head.family, child: true)
       @group.memberships.create!(person: @child)
-      @group2 = FactoryGirl.create(:group, parents_of: @group.id)
+      @group2 = FactoryGirl.create(:group, membership_mode: 'parents_of', parents_of: @group.id)
     end
 
     it 'should update its membership based on a parents_of selection' do
@@ -119,9 +134,7 @@ describe Group do
     @group.attendance_records.create!(person_id: @person.id, attended_at: '2008-07-22')
     records = @group.get_people_attendance_records_for_date('2008-07-22')
     expect(records.length).to eq(2)
-    expect(records.select do |r|
-  r.last
-end.length).to eq(1)
+    expect(records.select(&:last).length).to eq(1)
   end
 
   it "should be able to parse out the Google Calendar account info from an XML link" do
@@ -132,5 +145,102 @@ end.length).to eq(1)
   it "should be able to parse out the Google Calendar account info from an HTML link" do
     @group.update_attributes!(gcal_private_link: 'http://www.google.com/calendar/hosted/timmorgan.org/embed?src=4azsf34hrgq1t3lkjh4sdewzxc%40group.calendar.google.com&ctz=America/Chicago&pvttk=2a2453bc8ef65dddf11a4f43a133df12')
     expect(@group.gcal_account).to eq("4azsf34hrgq1t3lkjh4sdewzxc%40group.calendar.google.com")
+  end
+
+  describe 'share_token' do
+    it 'gets set on creation' do
+      expect(@group.share_token).to match(/^[0-9a-f]{50}$/)
+    end
+  end
+
+  describe 'geocoding' do
+    context 'group with address' do
+      let(:location) { "650 S. Peoria Ave.\nTulsa OK 74120" }
+      let(:group)    { FactoryGirl.create(:group, location: location) }
+
+      before do
+        Geocoder::Lookup::Test.add_stub(
+          "650 S. Peoria Ave.\nTulsa OK 74120, US", [
+            {
+              'latitude'     => 36.151305,
+              'longitude'    => -95.975393,
+              'address'      => 'Tulsa, OK, USA',
+              'state'        => 'Oklahoma',
+              'state_code'   => 'OK',
+              'country'      => 'United States',
+              'country_code' => 'US'
+            }
+          ]
+        )
+      end
+
+      it 'sets latitude and longitude' do
+        expect(group.reload.attributes).to include(
+          'latitude'  => within(0.00001).of(36.151305),
+          'longitude' => within(0.00001).of(-95.975393)
+        )
+
+      end
+
+      context 'address is removed' do
+        before do
+          Geocoder::Lookup::Test.add_stub(
+            ", US", [
+              {
+                'precision' => 'APPROXIMATE',
+                'latitude'  => 35,
+                'longitude' => -95
+              }
+            ]
+          )
+        end
+
+        before do
+          group.location = ''
+          group.save!
+        end
+
+        it 'removes latitude and longitude' do
+          expect(group.latitude).to be_nil
+          expect(group.longitude).to be_nil
+        end
+      end
+    end
+  end
+
+  describe 'validations' do
+    context 'group does not belong to a Checkin GroupTime and does not have attendance enabled' do
+      before do
+        @group.update_attribute(:attendance, false)
+      end
+
+      it 'is valid' do
+        expect(@group).to be_valid
+      end
+    end
+
+    context 'group belongs to a Checkin GroupTime and does not have attendance enabled' do
+      before do
+        @group.update_attribute(:attendance, false)
+        @checkin_time = FactoryGirl.create(:checkin_time)
+        @checkin_time.group_times.create!(group: @group)
+      end
+
+      it 'is invalid' do
+        expect(@group).not_to be_valid
+      end
+    end
+
+    context 'group belongs to a Checkin GroupTime and has attendance enabled' do
+      before do
+        @group.update_attribute(:attendance, true)
+        @checkin_time = FactoryGirl.create(:checkin_time)
+        @checkin_time.group_times.create!(group: @group)
+      end
+
+      it 'is valid' do
+        expect(@group).to be_valid
+      end
+    end
   end
 end

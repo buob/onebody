@@ -39,6 +39,9 @@ mkdir -p tmp/pids log public/system
 chmod -R 777 tmp log public/system
 chmod -R 777 cache
 
+# Make server (passenger) run as $USER
+chown $USER config.ru
+
 # brightbox may have a slightly newer version than we're pinned to -- that's ok
 sed -i '/ruby-version/d' Gemfile
 
